@@ -27,12 +27,12 @@ class DichVuViewModel @Inject constructor(
     val dsGoi = gDao.dangBan().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val thongBao = MutableStateFlow("")
 
-    fun themDichVu(ten: String, gia: Long, donVi: String) = viewModelScope.launch {
+    fun themDichVu(ten: String, gia: Long, donVi: String, nhom: String = "KHAC") = viewModelScope.launch {
         runCatching {
             require(ten.isNotBlank()) { "Nhập tên dịch vụ" }
             require(gia >= 0) { "Giá phải >= 0" }
             val ma = "DV" + (System.currentTimeMillis() % 100000)
-            dvDao.them(DichVu(UUID.randomUUID().toString(), ma, ten.trim(), "", gia, donVi.ifBlank { "lần" }))
+            dvDao.them(DichVu(UUID.randomUUID().toString(), ma, ten.trim(), "", gia, donVi.ifBlank { "lần" }, "DANGBAN", nhom))
             thongBao.value = "Đã thêm dịch vụ $ten"
         }.onFailure { thongBao.value = it.message ?: "Thêm thất bại" }
     }

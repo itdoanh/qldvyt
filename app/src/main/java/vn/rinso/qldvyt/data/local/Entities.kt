@@ -95,6 +95,8 @@ data class DichVu(
     val giaNiemYet: Long = 0L, // VNĐ, giá catalog (snapshot vào đơn khi bán)
     val donVi: String = "lần",
     val trangThai: String = "DANGBAN",
+    /** Nhóm sổ doanh thu kiểu MISA: TIEM_TRUYEN / DI_XE_TRONG / THU_TUC / CHAM_SOC / VAT_LY / KHAC */
+    val nhom: String = "KHAC",
 )
 
 /** Gói dịch vụ (VD: gói chăm sóc sau mổ 7 ngày). */

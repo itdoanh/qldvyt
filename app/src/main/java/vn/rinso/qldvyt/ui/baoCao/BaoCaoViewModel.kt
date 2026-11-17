@@ -10,18 +10,40 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import vn.rinso.qldvyt.data.backup.SaoLuuManager
 import vn.rinso.qldvyt.data.local.BangLuongDao
+import vn.rinso.qldvyt.data.local.DichVuDao
+import vn.rinso.qldvyt.data.local.DonHangChiTietDao
 import vn.rinso.qldvyt.data.local.DonHangDao
 
-/** ViewModel Báo cáo: doanh thu tháng + lương tháng + xuất CSV. */
+/** Tên nhóm sổ doanh thu tiếng Việt (giống sổ tay công ty). */
+fun tenNhomSo(nhom: String): String = when (nhom) {
+    "TIEM_TRUYEN" -> "Tiêm truyền tại nhà"
+    "DI_XE_TRONG" -> "Đi xe – Trông bệnh nhân"
+    "THU_TUC" -> "Làm thủ tục – Giấy tờ"
+    "CHAM_SOC" -> "Chăm sóc tại nhà"
+    "VAT_LY" -> "Vật lý trị liệu"
+    else -> "Khác"
+}
+
+/** 1 dòng doanh thu theo nhóm sổ. */
+data class CotNhom(val nhom: String, val tong: Long, val soDon: Int)
+
+/** 1 cột doanh thu theo cụm ngày (vẽ biểu đồ). */
+data class CotNgay(val nhan: String, val tong: Long)
+
+/** ViewModel Báo cáo tổng hợp kiểu MISA: doanh thu + nhóm sổ + biểu đồ + lương + CSV. */
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class BaoCaoViewModel @Inject constructor(
     private val donDao: DonHangDao,
+    private val chiTietDao: DonHangChiTietDao,
+    private val dichVuDao: DichVuDao,
     private val bangLuongDao: BangLuongDao,
     private val saoLuu: SaoLuuManager,
 ) : ViewModel() {
@@ -52,7 +74,67 @@ class BaoCaoViewModel @Inject constructor(
     val dsDon = donDao.moiNhat()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    /** Xuất CSV bảng lương tháng ra file (mở bằng Excel). */
+    val tongNo = donDao.tongCongNo()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
+
+    /** Toàn bộ đơn trong tháng đang xem (mọi trạng thái). */
+    val dsDonThang = thangNam.flatMapLatest { (t, n) ->
+        val (tu, den) = dauCuoiThang(t, n)
+        flow { emit(donDao.trongKy(tu, den)) }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /** Doanh thu group theo nhóm sổ (chỉ đơn HOAN_THANH). */
+    val theoNhom = thangNam.flatMapLatest { (t, n) ->
+        val (tu, den) = dauCuoiThang(t, n)
+        flow {
+            val cts = chiTietDao.trongKyHoanThanh(tu, den)
+            val dsDv = try { dichVuDao.tatCa().first() } catch (_: Exception) { emptyList() }
+            val mapNhom = dsDv.associate { it.id to it.nhom }
+            val g = cts.groupBy { ct -> ct.dichVuId?.let { mapNhom[it] } ?: "KHAC" }
+                .map { (nhom, list) -> CotNhom(nhom, list.sumOf { it.thanhTien }, list.size) }
+                .sortedByDescending { it.tong }
+            emit(g)
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /** Biểu đồ gom 3 ngày/cột trong tháng đang xem. */
+    val bieuDoNgay = combine(thang, nam, dsDonThang) { t, n, dsDonThangVal ->
+        val ds = dsDonThangVal.filter { it.trangThai == "HOAN_THANH" }
+        if (ds.isEmpty()) return@combine emptyList()
+        val (tu, _) = dauCuoiThang(t, n)
+        val c0 = Calendar.getInstance().apply { timeInMillis = tu }
+        val soNgay = c0.getActualMaximum(Calendar.DAY_OF_MONTH)
+        val res = mutableListOf<CotNgay>()
+        var i = 1
+        while (i <= soNgay) {
+            val j = minOf(i + 2, soNgay)
+            val tong = ds.filter {
+                val c = Calendar.getInstance().apply { timeInMillis = it.ngayTao }
+                val d = c.get(Calendar.DAY_OF_MONTH)
+                d in i..j
+            }.sumOf { it.tongThanhToan }
+            res += CotNgay("$i-$j", tong)
+            i += 3
+        }
+        res
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun xuatCsvDon(uri: Uri) = viewModelScope.launch {
+        runCatching {
+            val ds = dsDonThang.value
+            val hang: List<Map<String, Any?>> = ds.map { don ->
+                mapOf(
+                    "MaDon" to don.maDh, "Ngay" to don.ngayTao,
+                    "TrangThai" to don.trangThai, "TongHang" to don.tongTienHang,
+                    "GiamGia" to don.giamGia, "ThanhToan" to don.tongThanhToan,
+                    "DaThu" to don.daThu, "ConNo" to don.conNo,
+                )
+            }
+            saoLuu.xuatCsv("don_hang", uri, hang)
+            thongBao.value = "Đã xuất CSV ${ds.size} đơn tháng ${thang.value}/${nam.value}"
+        }.onFailure { thongBao.value = it.message ?: "Xuất thất bại" }
+    }
+
     fun xuatCsvLuong(uri: Uri) = viewModelScope.launch {
         runCatching {
             val ds = dsLuong.value
@@ -71,21 +153,13 @@ class BaoCaoViewModel @Inject constructor(
         }.onFailure { thongBao.value = it.message ?: "Xuất thất bại" }
     }
 
-    /** Xuất CSV đơn hàng tháng đang xem ra file. */
-    fun xuatCsvDon(uri: Uri) = viewModelScope.launch {
+    fun xuatCsvSoDoanhThu(uri: Uri) = viewModelScope.launch {
         runCatching {
-            val (tu, den) = dauCuoiThang(thang.value, nam.value)
-            val ds = dsDon.value.filter { it.ngayTao in tu..den }
-            val hang: List<Map<String, Any?>> = ds.map { don ->
-                mapOf(
-                    "MaDon" to don.maDh, "Ngay" to don.ngayTao,
-                    "TrangThai" to don.trangThai, "TongHang" to don.tongTienHang,
-                    "GiamGia" to don.giamGia, "ThanhToan" to don.tongThanhToan,
-                    "DaThu" to don.daThu, "ConNo" to don.conNo,
-                )
+            val hang = theoNhom.value.map {
+                mapOf("Nhom" to tenNhomSo(it.nhom), "SoDon" to it.soDon, "DoanhThu" to it.tong)
             }
-            saoLuu.xuatCsv("don_hang", uri, hang)
-            thongBao.value = "Đã xuất CSV ${ds.size} đơn"
+            saoLuu.xuatCsv("so_doanh_thu", uri, hang)
+            thongBao.value = "Đã xuất CSV sổ doanh thu (${hang.size} nhóm)"
         }.onFailure { thongBao.value = it.message ?: "Xuất thất bại" }
     }
 }

@@ -87,8 +87,14 @@ interface DonHangDao {
     @Query("SELECT * FROM don_hang WHERE trangThai = :tt ORDER BY ngayTao DESC")
     fun theoTrangThai(tt: String): Flow<List<DonHang>>
 
+    @Query("SELECT * FROM don_hang WHERE ngayTao BETWEEN :tu AND :den ORDER BY ngayTao DESC")
+    suspend fun trongKy(tu: Long, den: Long): List<DonHang>
+
     @Query("SELECT COALESCE(SUM(tongThanhToan),0) FROM don_hang WHERE trangThai='HOAN_THANH' AND ngayTao BETWEEN :tu AND :den")
     fun doanhThu(tu: Long, den: Long): Flow<Long>
+
+    @Query("SELECT COALESCE(SUM(tongThanhToan),0) FROM don_hang WHERE trangThai='HOAN_THANH' AND ngayTao BETWEEN :tu AND :den")
+    suspend fun doanhThuMotLan(tu: Long, den: Long): Long
 
     @Query("SELECT COALESCE(SUM(conNo),0) FROM don_hang WHERE conNo > 0 AND trangThai != 'HUY'")
     fun tongCongNo(): Flow<Long>
@@ -107,6 +113,9 @@ interface DonHangDao {
 interface DonHangChiTietDao {
     @Query("SELECT * FROM don_hang_chi_tiet WHERE donHangId = :donId")
     suspend fun theoDon(donId: String): List<DonHangChiTiet>
+
+    @Query("SELECT ct.* FROM don_hang_chi_tiet ct INNER JOIN don_hang d ON d.id = ct.donHangId WHERE d.ngayTao BETWEEN :tu AND :den AND d.trangThai = 'HOAN_THANH'")
+    suspend fun trongKyHoanThanh(tu: Long, den: Long): List<DonHangChiTiet>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun them(ct: DonHangChiTiet)

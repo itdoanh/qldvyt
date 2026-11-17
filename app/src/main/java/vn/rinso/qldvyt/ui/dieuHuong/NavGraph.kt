@@ -80,7 +80,7 @@ fun QldvytNavGraph() {
     val mucList = listOf(
         Tuyen.TONG_QUAN to "Tổng quan",
         Tuyen.DON_HANG to "Đơn hàng",
-        Tuyen.NHIEM_VU to "Nhiệm vụ",
+        Tuyen.BAO_CAO to "Báo cáo",
         Tuyen.KHO to "Kho",
         Tuyen.THEM to "Thêm",
     )
@@ -106,7 +106,7 @@ fun QldvytNavGraph() {
                     val icon = when (tuyen) {
                         Tuyen.TONG_QUAN -> Icons.Filled.Home
                         Tuyen.DON_HANG -> Icons.Filled.ShoppingCart
-                        Tuyen.NHIEM_VU -> Icons.Filled.List
+                        Tuyen.BAO_CAO -> Icons.Filled.List
                         Tuyen.KHO -> Icons.Filled.Add
                         else -> Icons.Filled.Person
                     }
@@ -125,7 +125,13 @@ fun QldvytNavGraph() {
             startDestination = Tuyen.TONG_QUAN,
             modifier = Modifier.padding(dem),
         ) {
-            composable(Tuyen.TONG_QUAN) { ManHinhTongQuan(onGioiThieu = { nav.navigate(Tuyen.GIOI_THIEU) }) }
+            composable(Tuyen.TONG_QUAN) {
+                ManHinhTongQuan(
+                    onGioiThieu = { nav.navigate(Tuyen.GIOI_THIEU) },
+                    onBaoCao = { nav.navigate(Tuyen.BAO_CAO) },
+                    onDonHang = { nav.navigate(Tuyen.TAO_DON) },
+                )
+            }
             composable(Tuyen.DON_HANG) {
                 ManHinhDonHang(
                     onTaoDon = { nav.navigate(Tuyen.TAO_DON) },
