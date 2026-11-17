@@ -46,4 +46,16 @@ object AppModule {
     @Provides @Singleton
     fun donHangRepository(db: QldvytDatabase): vn.rinso.qldvyt.data.repo.DonHangRepository =
         vn.rinso.qldvyt.data.repo.DonHangRepository(db)
+
+    @Provides @Singleton
+    fun nhiemVuRepository(db: QldvytDatabase): vn.rinso.qldvyt.data.repo.NhiemVuRepository =
+        vn.rinso.qldvyt.data.repo.NhiemVuRepository(db)
+
+    @Provides @Singleton
+    fun khoRepository(db: QldvytDatabase): vn.rinso.qldvyt.data.repo.KhoRepository =
+        vn.rinso.qldvyt.data.repo.KhoRepository(db)
+
+    @Provides @Singleton
+    fun nhanVienRepository(db: QldvytDatabase): vn.rinso.qldvyt.data.repo.NhanVienRepository =
+        vn.rinso.qldvyt.data.repo.NhanVienRepository(db)
 }
