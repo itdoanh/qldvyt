@@ -42,8 +42,10 @@ import vn.rinso.qldvyt.ui.donHang.ManHinhChiTietDon
 import vn.rinso.qldvyt.ui.donHang.ManHinhDonHang
 import vn.rinso.qldvyt.ui.donHang.ManHinhTaoDon
 import vn.rinso.qldvyt.ui.gioiThieu.ManHinhGioiThieu
+import vn.rinso.qldvyt.ui.baoCao.ManHinhBaoCao
 import vn.rinso.qldvyt.ui.khachHang.ManHinhKhachHang
 import vn.rinso.qldvyt.ui.kho.ManHinhKho
+import vn.rinso.qldvyt.ui.luong.ManHinhLuong
 import vn.rinso.qldvyt.ui.nhanVien.ManHinhNhanVien
 import vn.rinso.qldvyt.ui.nhiemVu.ManHinhNhiemVu
 import vn.rinso.qldvyt.ui.saoLuu.ManHinhSaoLuu
@@ -59,6 +61,8 @@ object Tuyen {
     const val DICH_VU = "dich_vu"
     const val CONG_NO = "cong_no"
     const val NHAN_VIEN = "nhan_vien"
+    const val LUONG = "luong"
+    const val BAO_CAO = "bao_cao"
     const val NHIEM_VU = "nhiem_vu"
     const val KHO = "kho"
     const val THEM = "them"
@@ -147,10 +151,14 @@ fun QldvytNavGraph() {
             composable(Tuyen.NHIEM_VU) { ManHinhNhiemVu() }
             composable(Tuyen.KHO) { ManHinhKho() }
             composable(Tuyen.NHAN_VIEN) { ManHinhNhanVien() }
+            composable(Tuyen.LUONG) { ManHinhLuong() }
+            composable(Tuyen.BAO_CAO) { ManHinhBaoCao() }
             composable(Tuyen.THEM) {
                 ManHinhThem(
                     onKhachHang = { nav.navigate(Tuyen.KHACH_HANG) },
                     onNhanVien = { nav.navigate(Tuyen.NHAN_VIEN) },
+                    onLuong = { nav.navigate(Tuyen.LUONG) },
+                    onBaoCao = { nav.navigate(Tuyen.BAO_CAO) },
                     onDichVu = { nav.navigate(Tuyen.DICH_VU) },
                     onCongNo = { nav.navigate(Tuyen.CONG_NO) },
                     onCaiDat = { nav.navigate(Tuyen.CAI_DAT) },
@@ -185,11 +193,13 @@ private fun ManHinhCho(tieuDe: String, moTa: String) {
     }
 }
 
-/** Tab Thêm: gom Khách hàng, Nhân viên, Dịch vụ, Công nợ, Sao lưu, Cài đặt, Giới thiệu (+ P4 sau). */
+/** Tab Thêm: gom Khách hàng, Nhân viên, Lương, Báo cáo, Dịch vụ, Công nợ, Sao lưu, Cài đặt. */
 @Composable
 private fun ManHinhThem(
     onKhachHang: () -> Unit,
     onNhanVien: () -> Unit,
+    onLuong: () -> Unit,
+    onBaoCao: () -> Unit,
     onDichVu: () -> Unit,
     onCongNo: () -> Unit,
     onCaiDat: () -> Unit,
@@ -203,15 +213,12 @@ private fun ManHinhThem(
         Text("Chức năng khác", style = MaterialTheme.typography.headlineSmall)
         OutlinedButton(onClick = onKhachHang, modifier = Modifier.fillMaxWidth()) { Text("Khách hàng") }
         OutlinedButton(onClick = onNhanVien, modifier = Modifier.fillMaxWidth()) { Text("Nhân viên & chấm công") }
+        OutlinedButton(onClick = onLuong, modifier = Modifier.fillMaxWidth()) { Text("Bảng lương") }
+        OutlinedButton(onClick = onBaoCao, modifier = Modifier.fillMaxWidth()) { Text("Báo cáo & xuất CSV") }
         OutlinedButton(onClick = onDichVu, modifier = Modifier.fillMaxWidth()) { Text("Dịch vụ & Gói") }
         OutlinedButton(onClick = onCongNo, modifier = Modifier.fillMaxWidth()) { Text("Công nợ") }
         OutlinedButton(onClick = onSaoLuu, modifier = Modifier.fillMaxWidth()) { Text("Sao lưu & khôi phục (file .zip)") }
         OutlinedButton(onClick = onCaiDat, modifier = Modifier.fillMaxWidth()) { Text("Cài đặt hệ thống") }
         OutlinedButton(onClick = onGioiThieu, modifier = Modifier.fillMaxWidth()) { Text("Giới thiệu Rinso") }
-        Card {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text("P4 sắp tới: Lương, Doanh thu, Báo cáo CSV/PDF.")
-            }
-        }
     }
 }
