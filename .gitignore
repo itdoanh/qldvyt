@@ -1,0 +1,17 @@
+# Gradle
+.gradle/
+build/
+# Android
+local.properties
+*.apk
+*.aab
+# Room schemas giữ lại (không ignore)
+!app/schemas/
+# IDE
+.idea/
+*.iml
+.DS_Store
+# Backup file test
+*.zip
+tools/qa/screenshots/
+!tools/qa/screenshots/.gitkeep

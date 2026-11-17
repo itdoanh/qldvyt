@@ -1,0 +1,9 @@
+# Cursor rules — QLDVYT (auto-applied)
+
+- Ngôn ngữ: trả lời user bằng Tiếng Việt (kèm thuật ngữ English khi cần).
+- App UI: 100% Tiếng Việt; tiền VNĐ `Long`; ngày `dd/MM/yyyy`.
+- Công thức tiền chỉ nằm ở `domain/pricing/TinhTien.kt` theo `docs/03-cong-thuc-tinh-tien.md`.
+- Room local-first, backup file qua SAF; cấm server/cloud ở v1.
+- `minSdk 29`; không dùng API mới mà thiếu fallback.
+- Sửa code xong: chạy test tương ứng + cập nhật docs/ke-hoach tick checklist.
+- Commit message tiếng Việt, giữ author `itdoanh`.
