@@ -1,6 +1,9 @@
-# Gradle
+# Gradle build + local toolchain (không commit tool nặng)
 .gradle/
 build/
+app/build/
+tools/gradle/
+local.properties
 # Android
 local.properties
 *.apk

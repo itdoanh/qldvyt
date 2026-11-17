@@ -3,7 +3,7 @@
     <application
         android:name=".QldvytApp"
         android:allowBackup="true"
-        android:icon="@mipmap/ic_launcher"
+        android:icon="@drawable/ic_launcher"
         android:label="QLDVYT — Quản lý Dịch vụ Y tế"
         android:supportsRtl="true"
         android:theme="@style/Theme.QLDVYT">
