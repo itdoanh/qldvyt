@@ -3,6 +3,7 @@ package vn.rinso.qldvyt.ui.dieuHuong
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -10,10 +11,12 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -28,7 +31,9 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import vn.rinso.qldvyt.ui.caiDat.ManHinhCaiDat
 import vn.rinso.qldvyt.ui.gioiThieu.ManHinhGioiThieu
+import vn.rinso.qldvyt.ui.saoLuu.ManHinhSaoLuu
 import vn.rinso.qldvyt.ui.tongQuan.ManHinhTongQuan
 
 /** Tuyến điều hướng chính (tiếng Việt). */
@@ -38,6 +43,8 @@ object Tuyen {
     const val NHIEM_VU = "nhiem_vu"
     const val KHO = "kho"
     const val THEM = "them"
+    const val CAI_DAT = "cai_dat"
+    const val SAO_LUU = "sao_luu"
     const val GIOI_THIEU = "gioi_thieu"
 }
 
@@ -53,7 +60,19 @@ fun QldvytNavGraph() {
         Tuyen.THEM to "Thêm",
     )
     Scaffold(
-        topBar = { TopAppBar(title = { Text("QLDVYT — Quản lý Dịch vụ Y tế") }) },
+        topBar = {
+            TopAppBar(
+                title = { Text("QLDVYT — Quản lý Dịch vụ Y tế") },
+                actions = {
+                    IconButton(onClick = { nav.navigate(Tuyen.SAO_LUU) }) {
+                        Icon(Icons.Filled.Add, contentDescription = "Sao lưu")
+                    }
+                    IconButton(onClick = { nav.navigate(Tuyen.CAI_DAT) }) {
+                        Icon(Icons.Filled.Settings, contentDescription = "Cài đặt")
+                    }
+                }
+            )
+        },
         bottomBar = {
             NavigationBar {
                 val hienTai by nav.currentBackStackEntryAsState()
@@ -85,7 +104,9 @@ fun QldvytNavGraph() {
             composable(Tuyen.DON_HANG) { ManHinhCho(tieuDe = "Đơn hàng", moTa = "Phase P2: wizard tạo đơn 3 bước, thu tiền, công nợ.") }
             composable(Tuyen.NHIEM_VU) { ManHinhCho(tieuDe = "Nhiệm vụ", moTa = "Phase P3: giao việc tiêm truyền / thay băng / thủ tục, NV hưởng 30%.") }
             composable(Tuyen.KHO) { ManHinhCho(tieuDe = "Kho vật tư", moTa = "Phase P3: nhập / xuất / kiểm kê, cảnh báo tồn thấp.") }
-            composable(Tuyen.THEM) { ManHinhGioiThieu() }
+            composable(Tuyen.THEM) { ManHinhThem(onCaiDat = { nav.navigate(Tuyen.CAI_DAT) }, onSaoLuu = { nav.navigate(Tuyen.SAO_LUU) }, onGioiThieu = { nav.navigate(Tuyen.GIOI_THIEU) }) }
+            composable(Tuyen.CAI_DAT) { ManHinhCaiDat() }
+            composable(Tuyen.SAO_LUU) { ManHinhSaoLuu() }
             composable(Tuyen.GIOI_THIEU) { ManHinhGioiThieu() }
         }
     }
@@ -106,6 +127,31 @@ private fun ManHinhCho(tieuDe: String, moTa: String) {
                 Text("Dữ liệu lưu local trên máy, backup bằng file — không cần server.")
                 Spacer(modifier = Modifier.height(4.dp))
                 Text("Nhà phát triển: Rinso (Thuộc Rin) • Lập trình: Đoàn Văn Doanh (itdoanh)")
+            }
+        }
+    }
+}
+
+/** Tab Thêm: gom Nhân viên, Lương, Khách hàng, Công nợ, Dịch vụ, Báo cáo, Sao lưu, Cài đặt. */
+@Composable
+private fun ManHinhThem(onCaiDat: () -> Unit, onSaoLuu: () -> Unit, onGioiThieu: () -> Unit) {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(16.dp),
+        verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp),
+    ) {
+        Text("Chức năng khác", style = MaterialTheme.typography.headlineSmall)
+        androidx.compose.material3.OutlinedButton(onClick = onSaoLuu, modifier = Modifier.fillMaxWidth()) {
+            Text("Sao lưu & khôi phục (file .zip)")
+        }
+        androidx.compose.material3.OutlinedButton(onClick = onCaiDat, modifier = Modifier.fillMaxWidth()) {
+            Text("Cài đặt hệ thống")
+        }
+        androidx.compose.material3.OutlinedButton(onClick = onGioiThieu, modifier = Modifier.fillMaxWidth()) {
+            Text("Giới thiệu Rinso")
+        }
+        Card {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("P2–P4 sẽ mở dần: Nhân viên, Lương, Đơn hàng, Nhiệm vụ 30%, Kho, Công nợ, Báo cáo.")
             }
         }
     }

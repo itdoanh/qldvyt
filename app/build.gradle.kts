@@ -62,6 +62,7 @@ dependencies {
     // Hilt (DI)
     implementation("com.google.dagger:hilt-android:2.51.1")
     ksp("com.google.dagger:hilt-compiler:2.51.1")
+    implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
 
     // Room local-first (SQLite trên máy, không server)
     implementation("androidx.room:room-runtime:2.6.1")

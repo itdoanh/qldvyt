@@ -6,19 +6,34 @@ import androidx.room.RoomDatabase
 /**
  * Database local duy nhất của app (offline-first, không server).
  * Version 1 khởi đầu. Mọi thay đổi entity phải tăng version + viết Migration.
+ * Xem docs/02-thiet-ke-database-room.md
  */
 @Database(
-    entities = [CapBac::class, NhanVien::class, ChamCong::class, DichVu::class,
-        GoiDichVu::class, VatTu::class, KhachHang::class, DonHang::class, NhiemVu::class],
+    entities = [
+        CapBac::class, NhanVien::class, ChamCong::class, ThuongPhat::class, TamUng::class,
+        DichVu::class, GoiDichVu::class, GoiChiTiet::class,
+        VatTu::class, NhapKho::class,
+        KhachHang::class, DonHang::class, DonHangChiTiet::class, DonHangVatTu::class,
+        NhiemVu::class, ThanhToan::class, BangLuong::class,
+    ],
     version = 1,
     exportSchema = true,
 )
 abstract class QldvytDatabase : RoomDatabase() {
     abstract fun capBacDao(): CapBacDao
     abstract fun nhanVienDao(): NhanVienDao
-    abstract fun donHangDao(): DonHangDao
-    abstract fun nhiemVuDao(): NhiemVuDao
-    abstract fun vatTuDao(): VatTuDao
-    abstract fun khachHangDao(): KhachHangDao
+    abstract fun chamCongDao(): ChamCongDao
+    abstract fun thuongPhatDao(): ThuongPhatDao
+    abstract fun tamUngDao(): TamUngDao
     abstract fun dichVuDao(): DichVuDao
+    abstract fun goiDichVuDao(): GoiDichVuDao
+    abstract fun vatTuDao(): VatTuDao
+    abstract fun nhapKhoDao(): NhapKhoDao
+    abstract fun khachHangDao(): KhachHangDao
+    abstract fun donHangDao(): DonHangDao
+    abstract fun donHangChiTietDao(): DonHangChiTietDao
+    abstract fun donHangVatTuDao(): DonHangVatTuDao
+    abstract fun nhiemVuDao(): NhiemVuDao
+    abstract fun thanhToanDao(): ThanhToanDao
+    abstract fun bangLuongDao(): BangLuongDao
 }
