@@ -42,4 +42,8 @@ object AppModule {
     @Provides @Singleton fun nhiemVuDao(db: QldvytDatabase) = db.nhiemVuDao()
     @Provides @Singleton fun thanhToanDao(db: QldvytDatabase) = db.thanhToanDao()
     @Provides @Singleton fun bangLuongDao(db: QldvytDatabase) = db.bangLuongDao()
+
+    @Provides @Singleton
+    fun donHangRepository(db: QldvytDatabase): vn.rinso.qldvyt.data.repo.DonHangRepository =
+        vn.rinso.qldvyt.data.repo.DonHangRepository(db)
 }

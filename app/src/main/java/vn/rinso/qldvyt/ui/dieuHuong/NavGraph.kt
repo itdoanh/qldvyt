@@ -1,5 +1,6 @@
 package vn.rinso.qldvyt.ui.dieuHuong
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,6 +21,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -27,12 +29,20 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import vn.rinso.qldvyt.ui.caiDat.ManHinhCaiDat
+import vn.rinso.qldvyt.ui.congNo.ManHinhCongNo
+import vn.rinso.qldvyt.ui.dichVu.ManHinhDichVu
+import vn.rinso.qldvyt.ui.donHang.ManHinhChiTietDon
+import vn.rinso.qldvyt.ui.donHang.ManHinhDonHang
+import vn.rinso.qldvyt.ui.donHang.ManHinhTaoDon
 import vn.rinso.qldvyt.ui.gioiThieu.ManHinhGioiThieu
+import vn.rinso.qldvyt.ui.khachHang.ManHinhKhachHang
 import vn.rinso.qldvyt.ui.saoLuu.ManHinhSaoLuu
 import vn.rinso.qldvyt.ui.tongQuan.ManHinhTongQuan
 
@@ -40,12 +50,19 @@ import vn.rinso.qldvyt.ui.tongQuan.ManHinhTongQuan
 object Tuyen {
     const val TONG_QUAN = "tong_quan"
     const val DON_HANG = "don_hang"
+    const val TAO_DON = "tao_don"
+    const val CHI_TIET_DON = "chi_tiet_don/{donId}"
+    const val KHACH_HANG = "khach_hang"
+    const val DICH_VU = "dich_vu"
+    const val CONG_NO = "cong_no"
     const val NHIEM_VU = "nhiem_vu"
     const val KHO = "kho"
     const val THEM = "them"
     const val CAI_DAT = "cai_dat"
     const val SAO_LUU = "sao_luu"
     const val GIOI_THIEU = "gioi_thieu"
+
+    fun chiTietDon(donId: String) = "chi_tiet_don/$donId"
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -86,7 +103,7 @@ fun QldvytNavGraph() {
                         else -> Icons.Filled.Person
                     }
                     NavigationBarItem(
-                        selected = tuyenHienTai == tuyen,
+                        selected = tuyenHienTai == tuyen || (tuyen == Tuyen.DON_HANG && tuyenHienTai?.startsWith("chi_tiet_don") == true),
                         onClick = { nav.navigate(tuyen) { launchSingleTop = true } },
                         icon = { Icon(icon, contentDescription = nhan) },
                         label = { Text(nhan) },
@@ -101,10 +118,40 @@ fun QldvytNavGraph() {
             modifier = Modifier.padding(dem),
         ) {
             composable(Tuyen.TONG_QUAN) { ManHinhTongQuan(onGioiThieu = { nav.navigate(Tuyen.GIOI_THIEU) }) }
-            composable(Tuyen.DON_HANG) { ManHinhCho(tieuDe = "Đơn hàng", moTa = "Phase P2: wizard tạo đơn 3 bước, thu tiền, công nợ.") }
+            composable(Tuyen.DON_HANG) {
+                ManHinhDonHang(
+                    onTaoDon = { nav.navigate(Tuyen.TAO_DON) },
+                    onMoChiTiet = { id -> nav.navigate(Tuyen.chiTietDon(id)) },
+                )
+            }
+            composable(Tuyen.TAO_DON) {
+                ManHinhTaoDon(onXong = { nav.popBackStack(Tuyen.DON_HANG, false) })
+            }
+            composable(
+                route = Tuyen.CHI_TIET_DON,
+                arguments = listOf(navArgument("donId") { type = NavType.StringType }),
+            ) { back ->
+                ManHinhChiTietDon(donId = back.arguments?.getString("donId") ?: "")
+            }
+            composable(Tuyen.KHACH_HANG) {
+                ManHinhKhachHang(onChon = { nav.navigate(Tuyen.TAO_DON) })
+            }
+            composable(Tuyen.DICH_VU) { ManHinhDichVu() }
+            composable(Tuyen.CONG_NO) {
+                ManHinhCongNo(onMoDon = { id -> nav.navigate(Tuyen.chiTietDon(id)) })
+            }
             composable(Tuyen.NHIEM_VU) { ManHinhCho(tieuDe = "Nhiệm vụ", moTa = "Phase P3: giao việc tiêm truyền / thay băng / thủ tục, NV hưởng 30%.") }
             composable(Tuyen.KHO) { ManHinhCho(tieuDe = "Kho vật tư", moTa = "Phase P3: nhập / xuất / kiểm kê, cảnh báo tồn thấp.") }
-            composable(Tuyen.THEM) { ManHinhThem(onCaiDat = { nav.navigate(Tuyen.CAI_DAT) }, onSaoLuu = { nav.navigate(Tuyen.SAO_LUU) }, onGioiThieu = { nav.navigate(Tuyen.GIOI_THIEU) }) }
+            composable(Tuyen.THEM) {
+                ManHinhThem(
+                    onKhachHang = { nav.navigate(Tuyen.KHACH_HANG) },
+                    onDichVu = { nav.navigate(Tuyen.DICH_VU) },
+                    onCongNo = { nav.navigate(Tuyen.CONG_NO) },
+                    onCaiDat = { nav.navigate(Tuyen.CAI_DAT) },
+                    onSaoLuu = { nav.navigate(Tuyen.SAO_LUU) },
+                    onGioiThieu = { nav.navigate(Tuyen.GIOI_THIEU) },
+                )
+            }
             composable(Tuyen.CAI_DAT) { ManHinhCaiDat() }
             composable(Tuyen.SAO_LUU) { ManHinhSaoLuu() }
             composable(Tuyen.GIOI_THIEU) { ManHinhGioiThieu() }
@@ -132,26 +179,30 @@ private fun ManHinhCho(tieuDe: String, moTa: String) {
     }
 }
 
-/** Tab Thêm: gom Nhân viên, Lương, Khách hàng, Công nợ, Dịch vụ, Báo cáo, Sao lưu, Cài đặt. */
+/** Tab Thêm: gom Khách hàng, Dịch vụ, Công nợ, Sao lưu, Cài đặt, Giới thiệu (+ P3/P4 sau). */
 @Composable
-private fun ManHinhThem(onCaiDat: () -> Unit, onSaoLuu: () -> Unit, onGioiThieu: () -> Unit) {
+private fun ManHinhThem(
+    onKhachHang: () -> Unit,
+    onDichVu: () -> Unit,
+    onCongNo: () -> Unit,
+    onCaiDat: () -> Unit,
+    onSaoLuu: () -> Unit,
+    onGioiThieu: () -> Unit,
+) {
     Column(
         modifier = Modifier.fillMaxSize().padding(16.dp),
-        verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text("Chức năng khác", style = MaterialTheme.typography.headlineSmall)
-        androidx.compose.material3.OutlinedButton(onClick = onSaoLuu, modifier = Modifier.fillMaxWidth()) {
-            Text("Sao lưu & khôi phục (file .zip)")
-        }
-        androidx.compose.material3.OutlinedButton(onClick = onCaiDat, modifier = Modifier.fillMaxWidth()) {
-            Text("Cài đặt hệ thống")
-        }
-        androidx.compose.material3.OutlinedButton(onClick = onGioiThieu, modifier = Modifier.fillMaxWidth()) {
-            Text("Giới thiệu Rinso")
-        }
+        OutlinedButton(onClick = onKhachHang, modifier = Modifier.fillMaxWidth()) { Text("Khách hàng") }
+        OutlinedButton(onClick = onDichVu, modifier = Modifier.fillMaxWidth()) { Text("Dịch vụ & Gói") }
+        OutlinedButton(onClick = onCongNo, modifier = Modifier.fillMaxWidth()) { Text("Công nợ") }
+        OutlinedButton(onClick = onSaoLuu, modifier = Modifier.fillMaxWidth()) { Text("Sao lưu & khôi phục (file .zip)") }
+        OutlinedButton(onClick = onCaiDat, modifier = Modifier.fillMaxWidth()) { Text("Cài đặt hệ thống") }
+        OutlinedButton(onClick = onGioiThieu, modifier = Modifier.fillMaxWidth()) { Text("Giới thiệu Rinso") }
         Card {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text("P2–P4 sẽ mở dần: Nhân viên, Lương, Đơn hàng, Nhiệm vụ 30%, Kho, Công nợ, Báo cáo.")
+                Text("P3–P4 sắp tới: Nhân viên, Nhiệm vụ 30%, Kho, Lương, Báo cáo.")
             }
         }
     }
