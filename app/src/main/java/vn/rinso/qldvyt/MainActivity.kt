@@ -7,6 +7,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.lifecycle.lifecycleScope
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
@@ -26,7 +29,10 @@ class MainActivity : ComponentActivity() {
             runCatching { vn.rinso.qldvyt.data.local.seedNeuChuaCo(db, caiDat) }
         }
         setContent {
-            ChuDeQldvyt {
+            val cheDo by caiDat.cheDoGiaoDien.collectAsState(initial = "HE_THONG")
+            val toiHeThong = isSystemInDarkTheme()
+            val toi = when (cheDo) { "SANG" -> false; "TOI" -> true; else -> toiHeThong }
+            ChuDeQldvyt(toi = toi) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background

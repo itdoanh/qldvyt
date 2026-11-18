@@ -29,6 +29,7 @@ class CaiDat @Inject constructor(@ApplicationContext private val ctx: Context) {
         val TEN_CONG_TY = stringPreferencesKey("tenCongTy")
         val PIN_KHOA = stringPreferencesKey("pinKhoaApp")
         val DA_SEED = booleanPreferencesKey("daSeedDemo")
+        val CHE_DO_GIAO_DIEN = stringPreferencesKey("cheDoGiaoDien")
     }
 
     /** Số công chuẩn 1 tháng (mặc định 26). */
@@ -48,6 +49,15 @@ class CaiDat @Inject constructor(@ApplicationContext private val ctx: Context) {
 
     val daSeedDemo: Flow<Boolean> =
         ctx.store.data.map { it[Key.DA_SEED] ?: false }
+
+    /** Chế độ giao diện: SANG / TOI / HE_THONG (mặc định theo hệ thống). GD12. */
+    val cheDoGiaoDien: Flow<String> =
+        ctx.store.data.map { it[Key.CHE_DO_GIAO_DIEN] ?: "HE_THONG" }
+
+    suspend fun luuCheDoGiaoDien(cheDo: String) {
+        val chuan = when (cheDo) { "SANG", "TOI", "HE_THONG" -> cheDo else -> "HE_THONG" }
+        ctx.store.edit { it[Key.CHE_DO_GIAO_DIEN] = chuan }
+    }
 
     suspend fun luuCongChuan(giaTri: Double) {
         ctx.store.edit { it[Key.CONG_CHUAN] = giaTri.coerceIn(1.0, 31.0) }

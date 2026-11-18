@@ -1,6 +1,5 @@
 package vn.rinso.qldvyt.ui.tongQuan
 
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,44 +10,52 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material.icons.filled.Assessment
+import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.Payments
+import androidx.compose.material.icons.filled.ReceiptLong
+import androidx.compose.material.icons.filled.Task
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import vn.rinso.qldvyt.core.dinhDangNgay
 import vn.rinso.qldvyt.core.dinhDangTien
+import vn.rinso.qldvyt.ui.common.TheSoLieu
+import vn.rinso.qldvyt.ui.common.mauTrangThaiDon
+import vn.rinso.qldvyt.ui.common.NhanTrangThai
+import vn.rinso.qldvyt.ui.donHang.tenTrangThaiDon
 
-/** Màn Tổng quan kiểu MISA: gradient header + thẻ số + cảnh báo + lối tắt. */
+/** Tổng quan kiểu MISA: header gradient + lưới số liệu + cảnh báo + lối tắt + đơn mới nhất. */
 @Composable
 fun ManHinhTongQuan(
-    onGioiThieu: () -> Unit = {},
-    onBaoCao: () -> Unit = {},
+    onTaoDon: () -> Unit = {},
     onDonHang: () -> Unit = {},
+    onNhiemVu: () -> Unit = {},
+    onKho: () -> Unit = {},
+    onBaoCao: () -> Unit = {},
+    onCongNo: () -> Unit = {},
+    onNhanVien: () -> Unit = {},
+    onMoDon: (String) -> Unit = {},
+    onGioiThieu: () -> Unit = {},
     vm: TongQuanViewModel = hiltViewModel(),
 ) {
     val doanhThuHomNay by vm.doanhThuHomNay.collectAsState()
@@ -57,78 +64,99 @@ fun ManHinhTongQuan(
     val tongNo by vm.tongNo.collectAsState()
     val sapHet by vm.dsSapHet.collectAsState()
     val dsNv by vm.dsNv.collectAsState()
-
-    val tyLeThang = (doanhThuHomNay.toFloat() / maxOf(1L, doanhThuThang).toFloat()).coerceIn(0f, 1f)
-    val tyLeAnim by animateFloatAsState(targetValue = tyLeThang, label = "tile")
+    val donXong by vm.donXongThang.collectAsState()
 
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        // Header gradient
         Box(
             Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp))
-                .background(Brush.horizontalGradient(listOf(Color(0xFF00796B), Color(0xFF26A69A))))
+                .background(Brush.horizontalGradient(listOf(Color(0xFF00796B), Color(0xFF26A69A), Color(0xFF00838F))))
                 .padding(20.dp),
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("QUẢN LÝ DỊCH VỤ Y TẾ", color = Color.White, style = MaterialTheme.typography.labelLarge)
-                Text("Tổng quan hôm nay", color = Color.White, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                Text("Doanh thu tháng: ${dinhDangTien(doanhThuThang)}", color = Color.White)
-                Spacer(Modifier.height(4.dp))
-                LinearProgressIndicator(progress = { tyLeAnim }, modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(99.dp)))
-                Text("Hôm nay đóng góp ${(tyLeThang * 100).toInt()}% của tháng", color = Color.White, style = MaterialTheme.typography.bodySmall)
+                Text("QUẢN LÝ DỊCH VỤ Y TẾ • RINSO", color = Color.White, style = MaterialTheme.typography.labelLarge)
+                Text("Tổng quan điều hành", color = Color.White, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Text("Hôm nay: ${dinhDangTien(doanhThuHomNay)} • Tháng: ${dinhDangTien(doanhThuThang)}", color = Color.White)
+                Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = onTaoDon) { Text("+ Tạo đơn") }
+                    OutlinedButton(onClick = onBaoCao) { Text("Báo cáo") }
+                }
             }
         }
 
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            TheTongQuan("Doanh thu hôm nay", dinhDangTien(doanhThuHomNay), Icons.Filled.ShoppingCart, Color(0xFF00796B), Modifier.weight(1f))
-            TheTongQuan("Đơn cần xử lý", "$donCho đơn", Icons.Filled.Info, Color(0xFFEF6C00), Modifier.weight(1f))
+            TheSoLieu("Doanh thu tháng", dinhDangTien(doanhThuThang), Icons.Filled.Payments, Color(0xFF00796B), "${donXong.size} đơn xong", Modifier.weight(1f))
+            TheSoLieu("Đơn cần xử lý", "$donCho đơn", Icons.Filled.ReceiptLong, Color(0xFFEF6C00), "Chờ + đang làm", Modifier.weight(1f))
         }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            TheTongQuan("Công nợ", dinhDangTien(tongNo), Icons.Filled.Warning, Color(0xFFC62828), Modifier.weight(1f))
-            TheTongQuan("Nhân sự", "${dsNv.size} NV", Icons.Filled.Person, Color(0xFF1565C0), Modifier.weight(1f))
+            TheSoLieu("Công nợ", dinhDangTien(tongNo), Icons.Filled.Warning, Color(0xFFC62828), "Bấm để thu nợ", Modifier.weight(1f))
+            TheSoLieu("Nhân sự", "${dsNv.size} NV", Icons.Filled.Group, Color(0xFF1565C0), "Đang làm việc", Modifier.weight(1f))
         }
 
         if (sapHet.isNotEmpty()) {
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
-                Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Icon(Icons.Filled.Warning, contentDescription = null)
-                    Text("⚠ Sắp hết kho: ${sapHet.take(3).joinToString { "${it.ten} (${it.tonKho.toInt()} ${it.donVi})" }}", fontWeight = FontWeight.SemiBold)
-                }
-            }
-        } else {
-            Card(colors = CardDefaults.cardColors(containerColor = Color(0xFFE8F5E9))) {
-                Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = Color(0xFF2E7D32))
-                    Text("Kho ổn định — không có vật tư dưới tồn tối thiểu.")
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("⚠ Sắp hết kho (${sapHet.size})", fontWeight = FontWeight.Bold)
+                    Text(sapHet.take(3).joinToString { "${it.ten} (còn ${it.tonKho.toInt()} ${it.donVi})" })
+                    OutlinedButton(onClick = onKho) { Text("Mở kho nhập hàng") }
                 }
             }
         }
 
         Card {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Lối tắt điều hành", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text("Lối tắt nghiệp vụ", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = onBaoCao, modifier = Modifier.weight(1f)) { Text("Báo cáo tổng hợp") }
-                    Button(onClick = onDonHang, modifier = Modifier.weight(1f)) { Text("Tạo đơn nhanh") }
+                    OutlinedButton(onClick = onDonHang, modifier = Modifier.weight(1f)) { Text("Đơn hàng") }
+                    OutlinedButton(onClick = onNhiemVu, modifier = Modifier.weight(1f)) { Text("Giao việc 30%") }
                 }
-                Text("Đơn hàng • nhiệm vụ NV hưởng 30% • vật tư • lương • công nợ — lưu local, backup file.", style = MaterialTheme.typography.bodySmall)
-                Button(onClick = onGioiThieu) { Text("Giới thiệu Rinso") }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = onNhanVien, modifier = Modifier.weight(1f)) { Text("Chấm công") }
+                    OutlinedButton(onClick = onCongNo, modifier = Modifier.weight(1f)) { Text("Thu nợ") }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = onKho, modifier = Modifier.weight(1f)) { Text("Kho") }
+                    OutlinedButton(onClick = onGioiThieu, modifier = Modifier.weight(1f)) { Text("Giới thiệu") }
+                }
+            }
+        }
+
+        Card {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("Đơn hoàn thành gần nhất", fontWeight = FontWeight.Bold)
+                    Text("${donXong.size} đơn", style = MaterialTheme.typography.bodySmall)
+                }
+                if (donXong.isEmpty()) {
+                    Text("Chưa có đơn hoàn thành trong tháng — hãy tạo đơn rồi bấm Hoàn thành.", style = MaterialTheme.typography.bodySmall)
+                } else {
+                    donXong.take(5).forEach { don ->
+                        Card(onClick = { onMoDon(don.id) }) {
+                            Row(Modifier.padding(12.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(don.maDh, fontWeight = FontWeight.SemiBold)
+                                    Text(dinhDangNgay(don.ngayTao) + " • " + dinhDangTien(don.tongThanhToan), style = MaterialTheme.typography.bodySmall)
+                                }
+                                NhanTrangThai(don.trangThai, tenTrangThaiDon(don.trangThai), mauTrangThaiDon(don.trangThai))
+                            }
+                        }
+                    }
+                }
+                OutlinedButton(onClick = onBaoCao, modifier = Modifier.fillMaxWidth()) {
+                    Text("Xem báo cáo tổng hợp (biểu đồ + sổ nhóm)")
+                }
+            }
+        }
+
+        Card {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("Nhiệm vụ hưởng 30% • Vật tư trừ kho tự động • Lương theo công", style = MaterialTheme.typography.bodySmall)
+                Text("Dữ liệu lưu trên máy, backup file .zip — không cần server.", style = MaterialTheme.typography.bodySmall)
             }
         }
     }
 }
 
-@Composable
-private fun TheTongQuan(tieuDe: String, giaTri: String, icon: ImageVector, mau: Color, modifier: Modifier = Modifier) {
-    Card(modifier = modifier, colors = CardDefaults.cardColors(containerColor = mau.copy(alpha = 0.10f))) {
-        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Box(Modifier.size(36.dp).clip(CircleShape).background(mau.copy(alpha = 0.18f)), contentAlignment = Alignment.Center) {
-                Icon(icon, contentDescription = null, tint = mau)
-            }
-            Text(tieuDe, style = MaterialTheme.typography.labelLarge)
-            Text(giaTri, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = mau)
-        }
-    }
-}

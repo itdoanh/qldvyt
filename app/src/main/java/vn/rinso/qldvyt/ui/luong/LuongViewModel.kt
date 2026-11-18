@@ -14,7 +14,14 @@ import vn.rinso.qldvyt.data.repo.LuongRepository
 
 /** ViewModel lương: chọn tháng → tính + chốt/mở khóa. */
 @HiltViewModel
-class LuongViewModel @Inject constructor(private val repo: LuongRepository) : ViewModel() {
+class LuongViewModel @Inject constructor(
+    private val repo: LuongRepository,
+    nhanVienDao: vn.rinso.qldvyt.data.local.NhanVienDao,
+) : ViewModel() {
+    val dsNv = nhanVienDao.tatCa()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun tenNv(id: String): String = dsNv.value.firstOrNull { it.id == id }?.let { "${it.hoTen} • ${it.maNv}" } ?: "NV: ${id.take(8)}…"
     private val cal = Calendar.getInstance()
     val thang = MutableStateFlow(cal.get(Calendar.MONTH) + 1)
     val nam = MutableStateFlow(cal.get(Calendar.YEAR))

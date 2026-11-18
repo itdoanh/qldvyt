@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -17,11 +18,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import vn.rinso.qldvyt.core.dinhDangTien
+import vn.rinso.qldvyt.ui.common.NhanTrangThai
+import vn.rinso.qldvyt.ui.common.OTrong
 
-/** Màn Lương: chọn tháng → tính cả tháng → chốt/mở khóa từng NV. */
+/** Màn Lương kiểu MISA: chọn tháng + tính cả tháng + chốt/mở khóa. */
 @Composable
 fun ManHinhLuong(vm: LuongViewModel = hiltViewModel()) {
     val thang by vm.thang.collectAsState()
@@ -30,31 +35,43 @@ fun ManHinhLuong(vm: LuongViewModel = hiltViewModel()) {
     val tb by vm.thongBao.collectAsState()
     val tong = ds.sumOf { it.thucLinh }
 
-    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("Bảng lương tháng $thang/$nam", style = MaterialTheme.typography.headlineSmall)
+    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text("Bảng lương $thang/$nam (${ds.size} NV)", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         if (tb.isNotEmpty()) Card { Text(tb, Modifier.padding(12.dp)) }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = {
-                if (thang == 1) { vm.thang.value = 12; vm.nam.value = nam - 1 } else vm.thang.value = thang - 1
-            }, modifier = Modifier.weight(1f)) { Text("◀ Tháng trước") }
-            Button(onClick = { vm.tinhCaThang() }, modifier = Modifier.weight(1f)) { Text("Tính cả tháng") }
-            OutlinedButton(onClick = {
-                if (thang == 12) { vm.thang.value = 1; vm.nam.value = nam + 1 } else vm.thang.value = thang + 1
-            }, modifier = Modifier.weight(1f)) { Text("Tháng sau ▶") }
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
+            Row(Modifier.padding(12.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                OutlinedButton(onClick = {
+                    if (thang == 1) { vm.thang.value = 12; vm.nam.value = nam - 1 } else vm.thang.value = thang - 1
+                }) { Text("◀") }
+                Column {
+                    Text("Tháng $thang/$nam", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text("Tổng: ${dinhDangTien(tong)}", style = MaterialTheme.typography.bodySmall)
+                }
+                OutlinedButton(onClick = {
+                    if (thang == 12) { vm.thang.value = 1; vm.nam.value = nam + 1 } else vm.thang.value = thang + 1
+                }) { Text("▶") }
+            }
         }
-        Card { Text("Tổng thực lĩnh: ${dinhDangTien(tong)} (${ds.size} NV)", Modifier.padding(16.dp), style = MaterialTheme.typography.titleMedium) }
+        Button(onClick = { vm.tinhCaThang() }, modifier = Modifier.fillMaxWidth()) { Text("🧮 Tính lương cả tháng") }
         if (ds.isEmpty()) {
-            Card { Text("Chưa có bảng lương. Bấm “Tính cả tháng” sau khi đã chấm công + hoàn thành nhiệm vụ.", Modifier.padding(16.dp)) }
+            OTrong("Chưa có bảng lương", "Chấm công + hoàn thành nhiệm vụ rồi bấm Tính cả tháng.")
         } else {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(ds, key = { it.id }) { bl ->
-                    Card {
+                    val ten = vm.tenNv(bl.nhanVienId)
+                    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest)) {
                         Column(Modifier.padding(12.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text("NV: ${bl.nhanVienId.take(8)}… • ${if (bl.trangThai == "CHOT") "ĐÃ CHỐT" else "Nháp"}", style = MaterialTheme.typography.titleMedium)
-                            Text("Công: ${bl.tongCong} • Theo công: ${dinhDangTien(bl.luongCoBan)}")
-                            Text("Nhiệm vụ 30%: ${dinhDangTien(bl.tienNhiemVu)} • Thưởng: ${dinhDangTien(bl.thuong)} • Chuyên cần: ${dinhDangTien(bl.chuyenCan)}")
-                            Text("Tạm ứng: ${dinhDangTien(bl.tamUng)} • Phạt: ${dinhDangTien(bl.khauTruKhac)}")
-                            Text("Thực lĩnh: ${dinhDangTien(bl.thucLinh)}", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text(ten, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                                NhanTrangThai(
+                                    bl.trangThai, if (bl.trangThai == "CHOT") "ĐÃ CHỐT" else "Nháp",
+                                    if (bl.trangThai == "CHOT") Color(0xFF2E7D32) else Color(0xFFEF6C00),
+                                )
+                            }
+                            Text("Công: ${bl.tongCong} • Theo công: ${dinhDangTien(bl.luongCoBan)}", style = MaterialTheme.typography.bodySmall)
+                            Text("NV 30%: ${dinhDangTien(bl.tienNhiemVu)} • Thưởng: ${dinhDangTien(bl.thuong)} • C.cần: ${dinhDangTien(bl.chuyenCan)}", style = MaterialTheme.typography.bodySmall)
+                            Text("Tạm ứng: ${dinhDangTien(bl.tamUng)} • Phạt: ${dinhDangTien(bl.khauTruKhac)}", style = MaterialTheme.typography.bodySmall)
+                            Text("Thực lĩnh: ${dinhDangTien(bl.thucLinh)}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 if (bl.trangThai != "CHOT") Button(onClick = { vm.chot(bl.nhanVienId) }) { Text("Chốt") }
                                 else OutlinedButton(onClick = { vm.moKhoa(bl.nhanVienId) }) { Text("Mở khóa (admin)") }

@@ -22,4 +22,7 @@ class CongNoViewModel @Inject constructor(
     val dsNo = combine(donDao.moiNhat(), caiDat.soNgayCanhBaoNo) { ds, _ ->
         ds.filter { it.conNo > 0 && it.trangThai != "HUY" }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val soNgayCanhBao = caiDat.soNgayCanhBaoNo
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 7)
 }

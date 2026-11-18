@@ -8,9 +8,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -22,13 +26,15 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import vn.rinso.qldvyt.core.dinhDangTien
 import vn.rinso.qldvyt.data.repo.MatHangMoi
 import vn.rinso.qldvyt.data.repo.VatTuDungMoi
+import vn.rinso.qldvyt.ui.common.OTimKiem
 
-/** Wizard tạo đơn 3 bước: 1) chọn khách → 2) chọn dịch vụ/vật tư → 3) xác nhận. */
+/** Wizard tạo đơn 3 bước kiểu MISA: chọn khách → chọn DV/vật tư → xác nhận. GD1. */
 @Composable
 fun ManHinhTaoDon(
     vm: DonHangViewModel = hiltViewModel(),
@@ -44,25 +50,39 @@ fun ManHinhTaoDon(
     val vtChon by vm.vatTuDaChon.collectAsState()
     val tb by vm.thongBao.collectAsState()
     var oGiam by remember { mutableStateOf("") }
+    var tkKh by remember { mutableStateOf("") }
+    var tkDv by remember { mutableStateOf("") }
 
     val tongHang = mhChon.sumOf { (it.soLuong * it.donGia).toLong() }
     val giam = oGiam.toLongOrNull() ?: 0L
     val thanhToan = maxOf(0L, tongHang - giam)
+    val khLoc = dsKhach.filter { tkKh.isBlank() || it.hoTen.contains(tkKh.trim(), true) || it.sdt.contains(tkKh.trim()) }
+    val dvLoc = dsDv.filter { tkDv.isBlank() || it.ten.contains(tkDv.trim(), true) }
+    val goiLoc = dsGoi.filter { tkDv.isBlank() || it.ten.contains(tkDv.trim(), true) }
 
-    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("Tạo đơn mới — bước $buoc/3", style = MaterialTheme.typography.headlineSmall)
+    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text("Tạo đơn mới", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        LinearProgressIndicator(progress = { buoc / 3f }, modifier = Modifier.fillMaxWidth())
+        Text(
+            when (buoc) { 1 -> "Bước 1/3: chọn khách hàng"; 2 -> "Bước 2/3: chọn dịch vụ + vật tư"; else -> "Bước 3/3: xác nhận + giảm giá" },
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold,
+        )
         if (tb.isNotEmpty()) Card { Text(tb, Modifier.padding(12.dp)) }
 
         if (buoc == 1) {
-            Text("Bước 1: chọn khách hàng")
-            if (dsKhach.isEmpty()) Text("Chưa có khách — hãy qua tab Khách hàng để thêm trước.")
+            OTimKiem(tkKh, { tkKh = it }, "Tìm khách theo tên / SĐT...")
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.weight(1f)) {
-                items(dsKhach, key = { it.id }) { kh ->
+                items(khLoc.take(30), key = { it.id }) { kh ->
                     val chon = khachChon == kh.id
-                    Card(onClick = { vm.chonKhach(kh.id) }) {
+                    Card(
+                        onClick = { vm.chonKhach(kh.id) },
+                        colors = if (chon) CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                        else CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest),
+                    ) {
                         Column(Modifier.padding(12.dp).fillMaxWidth()) {
-                            Text(kh.hoTen + if (chon) " ✓" else "", style = MaterialTheme.typography.titleMedium)
-                            Text("SĐT: ${kh.sdt.ifEmpty { "—" }}")
+                            Text((if (chon) "✓ " else "") + kh.hoTen, fontWeight = FontWeight.Bold)
+                            Text("${kh.maKh} • SĐT: ${kh.sdt.ifEmpty { "—" }}", style = MaterialTheme.typography.bodySmall)
+                            if (kh.diaChi.isNotEmpty()) Text(kh.diaChi, style = MaterialTheme.typography.bodySmall)
                         }
                     }
                 }
@@ -71,62 +91,62 @@ fun ManHinhTaoDon(
                 Text("Tiếp tục → chọn dịch vụ")
             }
         } else if (buoc == 2) {
-            Text("Bước 2: chọn dịch vụ/gói + vật tư (giá snapshot lúc bán)")
+            OTimKiem(tkDv, { tkDv = it }, "Tìm dịch vụ / gói...")
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.weight(1f)) {
-                items(dsDv, key = { it.id }) { dv ->
+                items(dvLoc, key = { it.id }) { dv ->
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Column(Modifier.weight(1f)) { Text(dv.ten); Text(dinhDangTien(dv.giaNiemYet), style = MaterialTheme.typography.bodySmall) }
-                        OutlinedButton(onClick = {
-                            vm.themMatHang(MatHangMoi(dichVuId = dv.id, tenHienThi = dv.ten, soLuong = 1.0, donGia = dv.giaNiemYet))
-                        }) { Text("+ Thêm") }
+                        Column(Modifier.weight(1f)) {
+                            Text(dv.ten, fontWeight = FontWeight.SemiBold)
+                            Text(dinhDangTien(dv.giaNiemYet) + " / " + dv.donVi, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                        }
+                        OutlinedButton(onClick = { vm.themMatHang(MatHangMoi(dichVuId = dv.id, tenHienThi = dv.ten, soLuong = 1.0, donGia = dv.giaNiemYet)) }) { Text("+ Thêm") }
                     }
                 }
-                items(dsGoi, key = { it.id }) { goi ->
+                items(goiLoc, key = { it.id }) { goi ->
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Column(Modifier.weight(1f)) { Text(goi.ten + " (gói)"); Text(dinhDangTien(goi.giaGoi), style = MaterialTheme.typography.bodySmall) }
-                        OutlinedButton(onClick = {
-                            vm.themMatHang(MatHangMoi(goiId = goi.id, tenHienThi = goi.ten, soLuong = 1.0, donGia = goi.giaGoi))
-                        }) { Text("+ Thêm") }
+                        Column(Modifier.weight(1f)) {
+                            Text(goi.ten + " (GÓI)", fontWeight = FontWeight.SemiBold)
+                            Text(dinhDangTien(goi.giaGoi), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                        }
+                        OutlinedButton(onClick = { vm.themMatHang(MatHangMoi(goiId = goi.id, tenHienThi = goi.ten, soLuong = 1.0, donGia = goi.giaGoi)) }) { Text("+ Thêm") }
                     }
                 }
             }
-            Text("Đã chọn ${mhChon.size} mặt hàng • Tổng: ${dinhDangTien(tongHang)}")
+            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
+                Text("Đã chọn ${mhChon.size} mặt hàng • Tổng: ${dinhDangTien(tongHang)}", Modifier.padding(12.dp), fontWeight = FontWeight.Bold)
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = { buoc = 1 }, modifier = Modifier.weight(1f)) { Text("← Quay lại") }
                 Button(onClick = { buoc = 3 }, enabled = mhChon.isNotEmpty(), modifier = Modifier.weight(1f)) { Text("Tiếp tục →") }
             }
         } else {
-            Text("Bước 3: xác nhận + giảm giá")
-            mhChon.forEachIndexed { i, m ->
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("${m.tenHienThi} × ${m.soLuong.toInt()} = ${dinhDangTien((m.soLuong * m.donGia).toLong())}", modifier = Modifier.weight(1f))
-                    OutlinedButton(onClick = { vm.xoaMatHang(i) }) { Text("Xóa") }
+            Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Mặt hàng đã chọn:", fontWeight = FontWeight.Bold)
+                mhChon.forEachIndexed { i, m ->
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("${m.tenHienThi} × ${m.soLuong.toInt()} = ${dinhDangTien((m.soLuong * m.donGia).toLong())}", modifier = Modifier.weight(1f))
+                        OutlinedButton(onClick = { vm.xoaMatHang(i) }) { Text("Xóa") }
+                    }
+                }
+                OutlinedTextField(oGiam, { oGiam = it.filter(Char::isDigit) }, label = { Text("Giảm giá (VNĐ)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                Text("Vật tư dùng cho đơn (trừ tồn kho):", fontWeight = FontWeight.Bold)
+                dsVt.take(15).forEach { vt ->
+                    AssistChip(onClick = { vm.themVatTu(VatTuDungMoi(vt.id, 1.0)) }, label = { Text("+ ${vt.ten} (${vt.tonKho.toInt()})") })
+                }
+                if (vtChon.isNotEmpty()) Text("Đã gắn ${vtChon.size} dòng vật tư.", color = MaterialTheme.colorScheme.primary)
+                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
+                    Column(Modifier.padding(12.dp)) {
+                        Text("Tổng hàng: ${dinhDangTien(tongHang)}")
+                        Text("Giảm: ${dinhDangTien(giam)}")
+                        Text("Thanh toán: ${dinhDangTien(thanhToan)}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
-            OutlinedTextField(
-                value = oGiam, onValueChange = { oGiam = it.filter(Char::isDigit) },
-                label = { Text("Giảm giá (VNĐ)") }, modifier = Modifier.fillMaxWidth(), singleLine = true,
-            )
-            var vtChonId by remember { mutableStateOf<String?>(null) }
-            Text("Vật tư dùng cho đơn (trừ tồn kho):")
-            dsVt.take(20).forEach { vt ->
-                AssistChip(
-                    onClick = {
-                        vtChonId = vt.id
-                        vm.themVatTu(VatTuDungMoi(vt.id, 1.0))
-                    },
-                    label = { Text("+ ${vt.ten} (${vt.tonKho.toInt()})") },
-                )
-            }
-            if (vtChon.isNotEmpty()) Text("Đã gắn ${vtChon.size} dòng vật tư.")
-            Text("Tổng thanh toán: ${dinhDangTien(thanhToan)}", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = { buoc = 2 }, modifier = Modifier.weight(1f)) { Text("← Quay lại") }
-                Button(onClick = {
-                    vm.giamGia.value = giam
-                    vm.taoDon { onXong() }
-                }, modifier = Modifier.weight(1f)) { Text("Tạo đơn") }
+                Button(onClick = { vm.giamGia.value = giam; vm.taoDon { onXong() } }, modifier = Modifier.weight(1f)) { Text("Tạo đơn") }
             }
         }
     }
 }
+
