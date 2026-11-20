@@ -37,7 +37,7 @@ import vn.rinso.qldvyt.core.dinhDangTien
 import vn.rinso.qldvyt.ui.common.OTimKiem
 import vn.rinso.qldvyt.ui.common.OTrong
 
-/** Man Kho v3: canh bao + tri gia + lich su nhap + them vat tu. */
+/** Màn Kho v3: cảnh báo + trị giá + lịch sử nhập + thêm vật tư. */
 @Composable
 fun ManHinhKho(vm: KhoViewModel = hiltViewModel()) {
     val ds by vm.dsVatTu.collectAsState()
@@ -58,36 +58,36 @@ fun ManHinhKho(vm: KhoViewModel = hiltViewModel()) {
     val mapVt = ds.associateBy { it.id }
 
     Scaffold(floatingActionButton = {
-        FloatingActionButton(onClick = { hienNhap = !hienNhap }) { Icon(Icons.Filled.Add, contentDescription = "Nhap kho") }
+        FloatingActionButton(onClick = { hienNhap = !hienNhap }) { Icon(Icons.Filled.Add, contentDescription = "Nhập kho") }
     }) { dem ->
         Column(Modifier.fillMaxSize().padding(dem).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("Kho vat tu (${ds.size})", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-            Text("Tri gia kho: ${dinhDangTien(triGia)} - Sap het: ${sapHet.size}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+            Text("Kho vật tư (${ds.size})", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Text("Trị giá kho: ${dinhDangTien(triGia)} - Sắp hết: ${sapHet.size}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
             if (tb.isNotEmpty()) Card { Text(tb, Modifier.padding(12.dp)) }
             if (sapHet.isNotEmpty()) {
                 Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
                     Column(Modifier.padding(12.dp)) {
-                        Text("Sap het: ${sapHet.size} mat hang", fontWeight = FontWeight.Bold)
-                        Text(sapHet.take(4).joinToString { "${it.ten} (con ${it.tonKho.toInt()})" }, style = MaterialTheme.typography.bodySmall)
+                        Text("Sắp hết: ${sapHet.size} mặt hàng", fontWeight = FontWeight.Bold)
+                        Text(sapHet.take(4).joinToString { "${it.ten} (còn ${it.tonKho.toInt()})" }, style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { tab = 0 }) { Text((if (tab == 0) "✓ " else "") + "Ton kho") }
-                OutlinedButton(onClick = { tab = 1 }) { Text((if (tab == 1) "✓ " else "") + "Lich su nhap (${dsNhap.size})") }
+                OutlinedButton(onClick = { tab = 0 }) { Text((if (tab == 0) "✓ " else "") + "Tồn kho") }
+                OutlinedButton(onClick = { tab = 1 }) { Text((if (tab == 1) "✓ " else "") + "Lịch sử nhập (${dsNhap.size})") }
             }
             if (tab == 1) {
                 if (dsNhap.isEmpty()) {
-                    OTrong("Chua co phieu nhap", "Bam + de nhap kho.", Icons.Filled.Inventory2)
+                    OTrong("Chưa có phiếu nhập", "Bấm + để nhập kho.", Icons.Filled.Inventory2)
                 } else {
                     LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(dsNhap.take(30), key = { it.id }) { nk ->
-                            val tenVt = mapVt[nk.vatTuId]?.ten ?: "Vat tu"
+                            val tenVt = mapVt[nk.vatTuId]?.ten ?: "Vật tư"
                             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest)) {
                                 Column(Modifier.padding(12.dp).fillMaxWidth()) {
                                     Text("$tenVt +${nk.soLuong.toInt()} x ${dinhDangTien(nk.donGiaNhap)}", fontWeight = FontWeight.Bold)
-                                    Text("${dinhDangNgay(nk.ngay)} - NCC: ${nk.nhaCungCap.ifEmpty { "khong ro" }}", style = MaterialTheme.typography.bodySmall)
-                                    Text("Thanh tien: ${dinhDangTien((nk.soLuong * nk.donGiaNhap).toLong())}", color = MaterialTheme.colorScheme.primary)
+                                    Text("${dinhDangNgay(nk.ngay)} - NCC: ${nk.nhaCungCap.ifEmpty { "không rõ" }}", style = MaterialTheme.typography.bodySmall)
+                                    Text("Thành tiền: ${dinhDangTien((nk.soLuong * nk.donGiaNhap).toLong())}", color = MaterialTheme.colorScheme.primary)
                                 }
                             }
                         }
@@ -95,30 +95,30 @@ fun ManHinhKho(vm: KhoViewModel = hiltViewModel()) {
                 }
                 return@Column
             }
-            OTimKiem(tk, { tk = it }, "Tim vat tu theo ten / ma VT")
+            OTimKiem(tk, { tk = it }, "Tìm vật tư theo tên / mã VT")
             if (hienNhap) {
                 Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
                     Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Nhap kho (gia von binh quan tu cap nhat)", fontWeight = FontWeight.Bold)
-                        Text("Vat tu: ${ds.firstOrNull { it.id == vtChon }?.ten ?: "chon o danh sach duoi"}")
-                        OutlinedTextField(oSl, { oSl = it.filter { c -> c.isDigit() || c == '.' } }, label = { Text("So luong nhap") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-                        OutlinedTextField(oGia, { oGia = it.filter(Char::isDigit) }, label = { Text("Don gia nhap (VND)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-                        OutlinedTextField(oNcc, { oNcc = it }, label = { Text("Nha cung cap") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                        Text("Nhập kho (giá vốn bình quân tự cập nhật)", fontWeight = FontWeight.Bold)
+                        Text("Vật tư: ${ds.firstOrNull { it.id == vtChon }?.ten ?: "chọn ở danh sách dưới"}")
+                        OutlinedTextField(oSl, { oSl = it.filter { c -> c.isDigit() || c == '.' } }, label = { Text("Số lượng nhập") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                        OutlinedTextField(oGia, { oGia = it.filter(Char::isDigit) }, label = { Text("Đơn giá nhập (VNĐ)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                        OutlinedTextField(oNcc, { oNcc = it }, label = { Text("Nhà cung cấp") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
                         Button(onClick = {
                             if (vtChon != null) {
                                 vm.nhapKho(vtChon!!, oSl.toDoubleOrNull() ?: 0.0, oGia.toLongOrNull() ?: 0L)
                                 oSl = ""; oGia = ""; oNcc = ""; hienNhap = false
                             }
-                        }, enabled = vtChon != null, modifier = Modifier.fillMaxWidth()) { Text("Xac nhan nhap kho") }
+                        }, enabled = vtChon != null, modifier = Modifier.fillMaxWidth()) { Text("Xác nhận nhập kho") }
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedTextField(oTen, { oTen = it }, label = { Text("Ten vat tu moi") }, modifier = Modifier.weight(1f))
-                            OutlinedButton(onClick = { vm.themVatTu(oTen, "cai", 5.0); oTen = "" }) { Text("+ Them") }
+                            OutlinedTextField(oTen, { oTen = it }, label = { Text("Tên vật tư mới") }, modifier = Modifier.weight(1f))
+                            OutlinedButton(onClick = { vm.themVatTu(oTen, "cái", 5.0); oTen = "" }) { Text("+ Thêm") }
                         }
                     }
                 }
             }
             if (dsLoc.isEmpty()) {
-                OTrong("Khong tim thay vat tu", "Thu tu khoa khac hoac them vat tu moi.", Icons.Filled.Inventory2)
+                OTrong("Không tìm thấy vật tư", "Thử từ khóa khác hoặc thêm vật tư mới.", Icons.Filled.Inventory2)
             } else {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(dsLoc, key = { it.id }) { vt ->
@@ -131,10 +131,10 @@ fun ManHinhKho(vm: KhoViewModel = hiltViewModel()) {
                             Column(Modifier.padding(12.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                     Text((if (vtChon == vt.id) "✓ " else "") + vt.ten, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                                    if (het) Text("SAP HET", color = Color(0xFFC62828), fontWeight = FontWeight.Bold)
+                                    if (het) Text("SẮP HẾT", color = Color(0xFFC62828), fontWeight = FontWeight.Bold)
                                 }
-                                Text("${vt.maVt} - Ton: ${vt.tonKho.toInt()} ${vt.donVi} - Toi thieu: ${vt.tonToiThieu.toInt()}", style = MaterialTheme.typography.bodySmall)
-                                Text("Von TB: ${dinhDangTien(vt.giaNhapTB)} - Tri gia: ${dinhDangTien((vt.tonKho * vt.giaNhapTB).toLong())}", color = MaterialTheme.colorScheme.primary)
+                                Text("${vt.maVt} - Tồn: ${vt.tonKho.toInt()} ${vt.donVi} - Tối thiểu: ${vt.tonToiThieu.toInt()}", style = MaterialTheme.typography.bodySmall)
+                                Text("Vốn TB: ${dinhDangTien(vt.giaNhapTB)} - Trị giá: ${dinhDangTien((vt.tonKho * vt.giaNhapTB).toLong())}", color = MaterialTheme.colorScheme.primary)
                             }
                         }
                     }

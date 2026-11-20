@@ -42,7 +42,7 @@ import vn.rinso.qldvyt.core.dinhDangTien
 import vn.rinso.qldvyt.ui.common.OTimKiem
 import vn.rinso.qldvyt.ui.common.OTrong
 
-/** Man Khach hang v3: cong no + tong chi tieu + goi nhanh + tao don. */
+/** Màn Khách hàng v3: công nợ + tổng chi tiêu + gọi nhanh + tạo đơn. */
 @Composable
 fun ManHinhKhachHang(
     vm: KhachHangViewModel = hiltViewModel(),
@@ -64,33 +64,33 @@ fun ManHinhKhachHang(
     val dsHien = if (chiNo) ds.filter { (noTheoKh[it.id]?.sumOf { d -> d.conNo } ?: 0L) > 0 } else ds
 
     Scaffold(floatingActionButton = {
-        FloatingActionButton(onClick = { hienThem = !hienThem }) { Icon(Icons.Filled.Add, contentDescription = "Them KH") }
+        FloatingActionButton(onClick = { hienThem = !hienThem }) { Icon(Icons.Filled.Add, contentDescription = "Thêm KH") }
     }) { dem ->
         Column(Modifier.fillMaxSize().padding(dem).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("Khach hang (${ds.size})", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-            Text("${noTheoKh.size} KH dang no - bam ten de tao don, bam dien thoai de goi.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+            Text("Khách hàng (${ds.size})", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Text("${noTheoKh.size} KH đang nợ - bấm tên để tạo đơn, bấm điện thoại để gọi.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
             if (tb.isNotEmpty()) Card { Text(tb, Modifier.padding(12.dp)) }
-            OTimKiem(tk, { vm.tuKhoa.value = it }, "Tim theo ten hoac SDT...")
+            OTimKiem(tk, { vm.tuKhoa.value = it }, "Tìm theo tên hoặc SĐT...")
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                AssistChip(onClick = { chiNo = false }, label = { Text((if (!chiNo) "✓ " else "") + "Tat ca") })
-                AssistChip(onClick = { chiNo = true }, label = { Text((if (chiNo) "✓ " else "") + "Dang no (${noTheoKh.size})") })
+                AssistChip(onClick = { chiNo = false }, label = { Text((if (!chiNo) "✓ " else "") + "Tất cả") })
+                AssistChip(onClick = { chiNo = true }, label = { Text((if (chiNo) "✓ " else "") + "Đang nợ (${noTheoKh.size})") })
             }
             if (hienThem) {
                 Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
                     Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Them khach hang moi", fontWeight = FontWeight.Bold)
-                        OutlinedTextField(oTen, { oTen = it }, label = { Text("Ho ten (*)") }, modifier = Modifier.fillMaxWidth())
-                        OutlinedTextField(oSdt, { oSdt = it.filter(Char::isDigit) }, label = { Text("SDT") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-                        OutlinedTextField(oDiaChi, { oDiaChi = it }, label = { Text("Dia chi") }, modifier = Modifier.fillMaxWidth())
+                        Text("Thêm khách hàng mới", fontWeight = FontWeight.Bold)
+                        OutlinedTextField(oTen, { oTen = it }, label = { Text("Họ tên (*)") }, modifier = Modifier.fillMaxWidth())
+                        OutlinedTextField(oSdt, { oSdt = it.filter(Char::isDigit) }, label = { Text("SĐT") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                        OutlinedTextField(oDiaChi, { oDiaChi = it }, label = { Text("Địa chỉ") }, modifier = Modifier.fillMaxWidth())
                         Button(onClick = {
                             vm.them(oTen, oSdt, oDiaChi)
                             oTen = ""; oSdt = ""; oDiaChi = ""; hienThem = false
-                        }, modifier = Modifier.fillMaxWidth()) { Text("Luu khach hang") }
+                        }, modifier = Modifier.fillMaxWidth()) { Text("Lưu khách hàng") }
                     }
                 }
             }
             if (dsHien.isEmpty()) {
-                OTrong("Chua co khach hang", "Bam + de them khach moi.", Icons.Filled.Person)
+                OTrong("Chưa có khách hàng", "Bấm + để thêm khách mới.", Icons.Filled.Person)
             } else {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(dsHien, key = { it.id }) { kh ->
@@ -108,16 +108,16 @@ fun ManHinhKhachHang(
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Column(Modifier.weight(1f)) {
                                         Text(kh.hoTen, fontWeight = FontWeight.Bold)
-                                        Text("${kh.maKh} - SDT: ${kh.sdt.ifEmpty { "—" }}", style = MaterialTheme.typography.bodySmall)
+                                        Text("${kh.maKh} - SĐT: ${kh.sdt.ifEmpty { "—" }}", style = MaterialTheme.typography.bodySmall)
                                     }
                                     if (kh.sdt.isNotEmpty()) IconButton(onClick = {
                                         ctx.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:${kh.sdt}")))
-                                    }) { Icon(Icons.Filled.Phone, contentDescription = "Goi") }
+                                    }) { Icon(Icons.Filled.Phone, contentDescription = "Gọi") }
                                 }
                                 if (kh.diaChi.isNotEmpty()) Text(kh.diaChi, style = MaterialTheme.typography.bodySmall)
-                                Text("${dons.size} don - Da chi: ${dinhDangTien(chi)}" + if (no > 0) " - No: ${dinhDangTien(no)}" else " - Khong no", style = MaterialTheme.typography.bodySmall, color = if (no > 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                                Text("${dons.size} đơn - Đã chi: ${dinhDangTien(chi)}" + if (no > 0) " - Nợ: ${dinhDangTien(no)}" else " - Không nợ", style = MaterialTheme.typography.bodySmall, color = if (no > 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
                                 if (kh.ghiChu.isNotEmpty()) Text(kh.ghiChu, style = MaterialTheme.typography.bodySmall)
-                                OutlinedButton(onClick = { onChon(kh.id) }) { Text("Tao don cho khach nay") }
+                                OutlinedButton(onClick = { onChon(kh.id) }) { Text("Tạo đơn cho khách này") }
                             }
                         }
                     }

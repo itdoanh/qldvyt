@@ -34,10 +34,25 @@ fun tenNhomSo(nhom: String): String = when (nhom) {
 /** 1 dòng doanh thu theo nhóm sổ. */
 data class CotNhom(val nhom: String, val tong: Long, val soDon: Int)
 
-/** 1 cột doanh thu theo cụm ngày (vẽ biểu đồ). */
-data class CotNgay(val nhan: String, val tong: Long)
+/** 1 cột doanh thu theo từng ngày trong tháng (chi tiết từng ngày 1..31). */
+data class CotNgay(val ngay: Int, val nhan: String, val tong: Long, val soDon: Int, val tienVat: Long)
 
-/** ViewModel Báo cáo tổng hợp kiểu MISA: doanh thu + nhóm sổ + biểu đồ + lương + CSV. */
+/** Thống kê tổng hợp tháng để hiển thị KPI. */
+data class ThongKeThang(
+    val doanhThu: Long = 0L,
+    val tienVat: Long = 0L,
+    val truocVat: Long = 0L,
+    val soDonHoanThanh: Int = 0,
+    val soDonCho: Int = 0,
+    val soDonDangLam: Int = 0,
+    val soDonHuy: Int = 0,
+    val tongNo: Long = 0L,
+    val trungBinhDon: Long = 0L,
+    val ngayCaoNhat: Int = 0,
+    val doanhThuCaoNhat: Long = 0L,
+)
+
+/** ViewModel Báo cáo tổng hợp: doanh thu từng ngày + nhóm sổ + lương + CSV. */
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class BaoCaoViewModel @Inject constructor(
@@ -51,6 +66,8 @@ class BaoCaoViewModel @Inject constructor(
     val thang = MutableStateFlow(cal.get(Calendar.MONTH) + 1)
     val nam = MutableStateFlow(cal.get(Calendar.YEAR))
     val thongBao = MutableStateFlow("")
+    /** Ngày đang chọn để xem chi tiết (null = chưa chọn). */
+    val ngayChon = MutableStateFlow<Int?>(null)
 
     private fun dauCuoiThang(t: Int, n: Int): Pair<Long, Long> {
         val tu = Calendar.getInstance().apply { set(n, t - 1, 1, 0, 0, 0); set(Calendar.MILLISECOND, 0) }
@@ -83,7 +100,30 @@ class BaoCaoViewModel @Inject constructor(
         flow { emit(donDao.trongKy(tu, den)) }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    /** Doanh thu group theo nhóm sổ (chỉ đơn HOAN_THANH). */
+    /** Thống kê KPI tháng: VAT, số đơn theo trạng thái, trung bình, ngày cao nhất. */
+    val thongKe = combine(dsDonThang, tongNo) { ds, no ->
+        val xong = ds.filter { it.trangThai == "HOAN_THANH" }
+        val vat = xong.sumOf { it.tienVat }
+        val dt = xong.sumOf { it.tongThanhToan }
+        val ngayMax = xong.groupBy {
+            Calendar.getInstance().apply { timeInMillis = it.ngayTao }.get(Calendar.DAY_OF_MONTH)
+        }.maxByOrNull { (_, l) -> l.sumOf { d -> d.tongThanhToan } }
+        ThongKeThang(
+            doanhThu = dt,
+            tienVat = vat,
+            truocVat = dt - vat,
+            soDonHoanThanh = xong.size,
+            soDonCho = ds.count { it.trangThai == "CHO_XU_LY" },
+            soDonDangLam = ds.count { it.trangThai == "DANG_LAM" },
+            soDonHuy = ds.count { it.trangThai == "HUY" },
+            tongNo = no,
+            trungBinhDon = if (xong.isNotEmpty()) dt / xong.size else 0L,
+            ngayCaoNhat = ngayMax?.key ?: 0,
+            doanhThuCaoNhat = ngayMax?.value?.sumOf { it.tongThanhToan } ?: 0L,
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ThongKeThang())
+
+    /** Doanh thu group theo nhóm sổ (chỉ đơn HOÀN THÀNH). */
     val theoNhom = thangNam.flatMapLatest { (t, n) ->
         val (tu, den) = dauCuoiThang(t, n)
         flow {
@@ -97,29 +137,22 @@ class BaoCaoViewModel @Inject constructor(
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    /** Biểu đồ gom 3 ngày/cột trong tháng đang xem. */
+    /** Biểu đồ chi tiết từng ngày 1..31 trong tháng đang xem. */
     val bieuDoNgay = combine(thang, nam, dsDonThang) { t, n, dsDonThangVal ->
         val ds = dsDonThangVal.filter { it.trangThai == "HOAN_THANH" }
-        if (ds.isEmpty()) return@combine emptyList()
         val (tu, _) = dauCuoiThang(t, n)
         val c0 = Calendar.getInstance().apply { timeInMillis = tu }
         val soNgay = c0.getActualMaximum(Calendar.DAY_OF_MONTH)
-        val res = mutableListOf<CotNgay>()
-        var i = 1
-        while (i <= soNgay) {
-            val j = minOf(i + 2, soNgay)
-            val tong = ds.filter {
+        (1..soNgay).map { d ->
+            val list = ds.filter {
                 val c = Calendar.getInstance().apply { timeInMillis = it.ngayTao }
-                val d = c.get(Calendar.DAY_OF_MONTH)
-                d in i..j
-            }.sumOf { it.tongThanhToan }
-            res += CotNgay("$i-$j", tong)
-            i += 3
+                c.get(Calendar.DAY_OF_MONTH) == d
+            }
+            CotNgay(d, d.toString(), list.sumOf { it.tongThanhToan }, list.size, list.sumOf { it.tienVat })
         }
-        res
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    /** Doanh thu tháng trước (để so sánh, vượt MISA chỉ xem 1 tháng). */
+    /** Doanh thu tháng trước (để so sánh). */
     val doanhThuThangTruoc = thangNam.flatMapLatest { (t, n) ->
         val tt = if (t == 1) 12 else t - 1
         val nn = if (t == 1) n - 1 else n
@@ -134,7 +167,8 @@ class BaoCaoViewModel @Inject constructor(
                 mapOf(
                     "MaDon" to don.maDh, "Ngay" to don.ngayTao,
                     "TrangThai" to don.trangThai, "TongHang" to don.tongTienHang,
-                    "GiamGia" to don.giamGia, "ThanhToan" to don.tongThanhToan,
+                    "GiamGia" to don.giamGia, "TienVAT" to don.tienVat,
+                    "TyLeVAT" to don.tyLeVat, "ThanhToan" to don.tongThanhToan,
                     "DaThu" to don.daThu, "ConNo" to don.conNo,
                 )
             }
@@ -150,10 +184,11 @@ class BaoCaoViewModel @Inject constructor(
                 mapOf(
                     "NV" to bl.nhanVienId.take(8), "Thang" to "${bl.thang}/${bl.nam}",
                     "Cong" to bl.tongCong, "TheoCong" to bl.luongCoBan,
-                    "NhiemVu30" to bl.tienNhiemVu, "Thuong" to bl.thuong,
-                    "ChuyenCan" to bl.chuyenCan, "TamUng" to bl.tamUng,
-                    "Phat" to bl.khauTruKhac, "ThucLinh" to bl.thucLinh,
-                    "TrangThai" to bl.trangThai,
+                    "NhiemVu30" to bl.tienNhiemVu, "HoaHong" to bl.hoaHong,
+                    "Thuong" to bl.thuong, "ChuyenCan" to bl.chuyenCan,
+                    "PhuCap" to bl.phuCap, "TamUng" to bl.tamUng,
+                    "Phat" to bl.khauTruKhac, "ThueTNCN" to bl.thueTncn,
+                    "ThucLinh" to bl.thucLinh, "TrangThai" to bl.trangThai,
                 )
             }
             saoLuu.xuatCsv("bang_luong", uri, hang)
@@ -168,6 +203,17 @@ class BaoCaoViewModel @Inject constructor(
             }
             saoLuu.xuatCsv("so_doanh_thu", uri, hang)
             thongBao.value = "Đã xuất CSV sổ doanh thu (${hang.size} nhóm)"
+        }.onFailure { thongBao.value = it.message ?: "Xuất thất bại" }
+    }
+
+    /** Xuất CSV chi tiết từng ngày trong tháng (ngày, số đơn, VAT, doanh thu). */
+    fun xuatCsvNgay(uri: Uri) = viewModelScope.launch {
+        runCatching {
+            val hang = bieuDoNgay.value.map {
+                mapOf("Ngay" to it.ngay, "SoDon" to it.soDon, "TienVAT" to it.tienVat, "DoanhThu" to it.tong)
+            }
+            saoLuu.xuatCsv("doanh_thu_ngay", uri, hang)
+            thongBao.value = "Đã xuất CSV doanh thu từng ngày (${hang.size} ngày)"
         }.onFailure { thongBao.value = it.message ?: "Xuất thất bại" }
     }
 }

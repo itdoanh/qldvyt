@@ -44,8 +44,11 @@ object AppModule {
     @Provides @Singleton fun bangLuongDao(db: QldvytDatabase) = db.bangLuongDao()
 
     @Provides @Singleton
-    fun donHangRepository(db: QldvytDatabase): vn.rinso.qldvyt.data.repo.DonHangRepository =
-        vn.rinso.qldvyt.data.repo.DonHangRepository(db)
+    fun donHangRepository(
+        db: QldvytDatabase,
+        caiDat: CaiDat,
+    ): vn.rinso.qldvyt.data.repo.DonHangRepository =
+        vn.rinso.qldvyt.data.repo.DonHangRepository(db, caiDat)
 
     @Provides @Singleton
     fun nhiemVuRepository(db: QldvytDatabase): vn.rinso.qldvyt.data.repo.NhiemVuRepository =

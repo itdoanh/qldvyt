@@ -216,8 +216,14 @@ interface DichVuDao {
     @Query("SELECT * FROM dich_vu ORDER BY ten")
     fun tatCa(): Flow<List<DichVu>>
 
+    @Query("SELECT * FROM dich_vu WHERE id = :id")
+    suspend fun theoId(id: String): DichVu?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun them(dv: DichVu)
+
+    @Update
+    suspend fun sua(dv: DichVu)
 }
 
 @Dao

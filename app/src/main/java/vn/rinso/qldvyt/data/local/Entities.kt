@@ -97,6 +97,10 @@ data class DichVu(
     val trangThai: String = "DANGBAN",
     /** Nhóm sổ doanh thu kiểu MISA: TIEM_TRUYEN / DI_XE_TRONG / THU_TUC / CHAM_SOC / VAT_LY / KHAC */
     val nhom: String = "KHAC",
+    /** Dịch vụ này có chịu thuế VAT không (bật/tắt từng dịch vụ). */
+    val chiuThue: Boolean = true,
+    /** Thuế suất riêng (null = dùng VAT mặc định hệ thống). VD 0.08 = 8%. */
+    val tyLeVatRieng: Double? = null,
 )
 
 /** Gói dịch vụ (VD: gói chăm sóc sau mổ 7 ngày). */
@@ -184,6 +188,10 @@ data class DonHang(
     val trangThai: String = "CHO_XU_LY",
     val tongTienHang: Long = 0L,
     val giamGia: Long = 0L,
+    /** Tiền VAT đã cộng vào thanh toán (0 nếu tắt VAT). */
+    val tienVat: Long = 0L,
+    /** Thuế suất VAT đã áp cho đơn (VD 0.08 = 8%). 0 = không VAT. */
+    val tyLeVat: Double = 0.0,
     val tongThanhToan: Long = 0L,
     val daThu: Long = 0L,
     val conNo: Long = 0L,
@@ -205,6 +213,8 @@ data class DonHangChiTiet(
     val soLuong: Double = 1.0,
     val donGia: Long = 0L,
     val thanhTien: Long = 0L,
+    /** Dòng này có chịu VAT không (snapshot tại lúc bán). */
+    val chiuThue: Boolean = true,
 )
 
 /** Vật tư đã xuất cho đơn (snapshot giá vốn lúc xuất). */
@@ -286,8 +296,11 @@ data class BangLuong(
     val hoaHong: Long = 0L,
     val thuong: Long = 0L,
     val chuyenCan: Long = 0L,
+    val phuCap: Long = 0L,
     val tamUng: Long = 0L,
     val khauTruKhac: Long = 0L,
+    /** Thuế TNCN đã khấu trừ (0 nếu tắt). */
+    val thueTncn: Long = 0L,
     val thucLinh: Long = 0L,
     /** NHAP / CHOT */
     val trangThai: String = "NHAP",

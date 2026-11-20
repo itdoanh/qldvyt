@@ -49,13 +49,29 @@ fun ManHinhTaoDon(
     val mhChon by vm.matHangDaChon.collectAsState()
     val vtChon by vm.vatTuDaChon.collectAsState()
     val tb by vm.thongBao.collectAsState()
+    val vatBatHt by vm.vatBat.collectAsState()
+    val vatApDon by vm.vatApDungDon.collectAsState()
+    val vatTheoDv by vm.vatTheoDv.collectAsState()
+    val tyLeVatMm by vm.vatMacDinh.collectAsState()
     var oGiam by remember { mutableStateOf("") }
     var tkKh by remember { mutableStateOf("") }
     var tkDv by remember { mutableStateOf("") }
 
     val tongHang = mhChon.sumOf { (it.soLuong * it.donGia).toLong() }
     val giam = oGiam.toLongOrNull() ?: 0L
-    val thanhToan = maxOf(0L, tongHang - giam)
+    val truocVat = maxOf(0L, tongHang - giam)
+    val vatBatMm = vatBatHt && vatApDon
+    val tienVatMm = if (!vatBatMm) 0L else if (vatTheoDv) {
+        mhChon.sumOf { m ->
+            if (!m.chiuThue) 0L else {
+                val thanh = (m.soLuong * m.donGia).toLong()
+                val tyTrong = if (tongHang > 0) thanh.toDouble() / tongHang else 0.0
+                val giamDong = (giam * tyTrong).toLong()
+                ((maxOf(0L, thanh - giamDong)) * tyLeVatMm).toLong()
+            }
+        }
+    } else (truocVat * tyLeVatMm).toLong()
+    val thanhToan = truocVat + tienVatMm
     val khLoc = dsKhach.filter { tkKh.isBlank() || it.hoTen.contains(tkKh.trim(), true) || it.sdt.contains(tkKh.trim()) }
     val dvLoc = dsDv.filter { tkDv.isBlank() || it.ten.contains(tkDv.trim(), true) }
     val goiLoc = dsGoi.filter { tkDv.isBlank() || it.ten.contains(tkDv.trim(), true) }
@@ -99,7 +115,7 @@ fun ManHinhTaoDon(
                             Text(dv.ten, fontWeight = FontWeight.SemiBold)
                             Text(dinhDangTien(dv.giaNiemYet) + " / " + dv.donVi, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
                         }
-                        OutlinedButton(onClick = { vm.themMatHang(MatHangMoi(dichVuId = dv.id, tenHienThi = dv.ten, soLuong = 1.0, donGia = dv.giaNiemYet)) }) { Text("+ Thêm") }
+                        OutlinedButton(onClick = { vm.themMatHang(MatHangMoi(dichVuId = dv.id, tenHienThi = dv.ten, soLuong = 1.0, donGia = dv.giaNiemYet, chiuThue = dv.chiuThue)) }) { Text("+ Thêm") }
                     }
                 }
                 items(goiLoc, key = { it.id }) { goi ->
@@ -138,6 +154,9 @@ fun ManHinhTaoDon(
                     Column(Modifier.padding(12.dp)) {
                         Text("Tổng hàng: ${dinhDangTien(tongHang)}")
                         Text("Giảm: ${dinhDangTien(giam)}")
+                        Text("Trước VAT: ${dinhDangTien(truocVat)}")
+                        if (vatBatMm) Text("VAT ${(tyLeVatMm * 100).toInt()}%: ${dinhDangTien(tienVatMm)}", fontWeight = FontWeight.SemiBold)
+                        else Text("VAT: Không áp dụng (tắt ở Cài đặt)", style = MaterialTheme.typography.bodySmall)
                         Text("Thanh toán: ${dinhDangTien(thanhToan)}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     }
                 }

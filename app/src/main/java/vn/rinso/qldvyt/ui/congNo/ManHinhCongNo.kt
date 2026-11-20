@@ -40,7 +40,7 @@ import vn.rinso.qldvyt.ui.common.OTrong
 import vn.rinso.qldvyt.ui.common.mauTrangThaiDon
 import vn.rinso.qldvyt.ui.donHang.tenTrangThaiDon
 
-/** Man Cong no v3: tong no + group theo KH + goi nhanh + tuoi no bucket. */
+/** Màn Công nợ v3: tổng nợ + group theo KH + gọi nhanh + tuổi nợ bucket. */
 @Composable
 fun ManHinhCongNo(
     vm: CongNoViewModel = hiltViewModel(),
@@ -65,22 +65,22 @@ fun ManHinhCongNo(
     val quaHan = dsLoc.count { (gio - it.ngayTao) / 86400000L >= soNgay }
 
     Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text("Cong no (${ds.size} don)", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Text("Công nợ (${ds.size} đơn)", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
             Column(Modifier.padding(16.dp)) {
-                Text("Tong con no", style = MaterialTheme.typography.labelLarge)
+                Text("Tổng còn nợ", style = MaterialTheme.typography.labelLarge)
                 Text(dinhDangTien(tong), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Color(0xFFC62828))
-                Text("Loc hien tai: ${dinhDangTien(tongLoc)} - Qua han: $quaHan don (tren $soNgay ngay).", style = MaterialTheme.typography.bodySmall)
+                Text("Lọc hiện tại: ${dinhDangTien(tongLoc)} - Quá hạn: $quaHan đơn (trên $soNgay ngày).", style = MaterialTheme.typography.bodySmall)
             }
         }
-        OTimKiem(tk, { tk = it }, "Tim theo ma don / ten KH...")
+        OTimKiem(tk, { tk = it }, "Tìm theo mã đơn / tên KH...")
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = { chiQuaHan = false }) { Text((if (!chiQuaHan) "✓ " else "") + "Tat ca") }
-            OutlinedButton(onClick = { chiQuaHan = true }) { Text((if (chiQuaHan) "✓ " else "") + "Qua han") }
+            OutlinedButton(onClick = { chiQuaHan = false }) { Text((if (!chiQuaHan) "✓ " else "") + "Tất cả") }
+            OutlinedButton(onClick = { chiQuaHan = true }) { Text((if (chiQuaHan) "✓ " else "") + "Quá hạn") }
             OutlinedButton(onClick = { theoKhach = !theoKhach }) { Text((if (theoKhach) "✓ " else "") + "Theo KH") }
         }
         if (dsLoc.isEmpty()) {
-            OTrong("Khong con cong no", "Tuyet voi - moi don da thu du.")
+            OTrong("Không còn công nợ", "Tuyệt vời - mọi đơn đã thu đủ.")
         } else if (theoKhach) {
             val theoKh = dsLoc.groupBy { it.khachHangId }.entries.sortedByDescending { e -> e.value.sumOf { it.conNo } }
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -90,15 +90,15 @@ fun ManHinhCongNo(
                     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest)) {
                         Column(Modifier.padding(12.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                                Text(kh?.hoTen ?: "KH le", fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                                Text(kh?.hoTen ?: "KH lẻ", fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                                 Text(dinhDangTien(tongKh), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
                             }
-                            Text("${dons.size} don no - SDT: ${kh?.sdt?.ifEmpty { "—" } ?: "—"}", style = MaterialTheme.typography.bodySmall)
+                            Text("${dons.size} đơn nợ - SĐT: ${kh?.sdt?.ifEmpty { "—" } ?: "—"}", style = MaterialTheme.typography.bodySmall)
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 if (!kh?.sdt.isNullOrEmpty()) IconButton(onClick = {
                                     ctx.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:${kh!!.sdt}")))
-                                }) { Icon(Icons.Filled.Phone, contentDescription = "Goi") }
-                                OutlinedButton(onClick = { onMoDon(dons.maxBy { it.conNo }.id) }) { Text("Thu don lon nhat") }
+                                }) { Icon(Icons.Filled.Phone, contentDescription = "Gọi") }
+                                OutlinedButton(onClick = { onMoDon(dons.maxBy { it.conNo }.id) }) { Text("Thu đơn lớn nhất") }
                             }
                         }
                     }
@@ -122,14 +122,14 @@ fun ManHinhCongNo(
                                 Text(don.maDh, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                                 NhanTrangThai(don.trangThai, tenTrangThaiDon(don.trangThai), mauTrangThaiDon(don.trangThai))
                             }
-                            Text("${kh?.hoTen ?: "KH le"} - ${kh?.sdt?.ifEmpty { "—" } ?: ""}", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                            Text("${dinhDangNgay(don.ngayTao)} - Tuoi no: $tuoiNo ngay" + if (qh) " - QUA HAN" else "", style = MaterialTheme.typography.bodySmall)
-                            Text("Con no: ${dinhDangTien(don.conNo)} (da thu ${dinhDangTien(don.daThu)}/${dinhDangTien(don.tongThanhToan)})", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
+                            Text("${kh?.hoTen ?: "KH lẻ"} - ${kh?.sdt?.ifEmpty { "—" } ?: ""}", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                            Text("${dinhDangNgay(don.ngayTao)} - Tuổi nợ: $tuoiNo ngày" + if (qh) " - QUÁ HẠN" else "", style = MaterialTheme.typography.bodySmall)
+                            Text("Còn nợ: ${dinhDangTien(don.conNo)} (đã thu ${dinhDangTien(don.daThu)}/${dinhDangTien(don.tongThanhToan)})", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                OutlinedButton(onClick = { onMoDon(don.id) }) { Text("Thu tien ngay") }
+                                OutlinedButton(onClick = { onMoDon(don.id) }) { Text("Thu tiền ngay") }
                                 if (!kh?.sdt.isNullOrEmpty()) OutlinedButton(onClick = {
                                     ctx.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:${kh!!.sdt}")))
-                                }) { Text("Goi KH") }
+                                }) { Text("Gọi KH") }
                             }
                         }
                     }

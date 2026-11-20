@@ -7,7 +7,7 @@ import androidx.room.Room
 object RoomDb {
     fun tao(ctx: Context): QldvytDatabase =
         Room.databaseBuilder(ctx.applicationContext, QldvytDatabase::class.java, "qldvyt.db")
-            .addMigrations(MIGRATION_1_2)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
             .fallbackToDestructiveMigrationOnDowngrade()
             .build()
 }

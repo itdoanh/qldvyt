@@ -41,16 +41,16 @@ import vn.rinso.qldvyt.ui.common.OTimKiem
 import vn.rinso.qldvyt.ui.common.OTrong
 import vn.rinso.qldvyt.ui.common.mauTrangThaiDon
 
-/** Ten trang thai don hien thi tieng Viet. */
+/** Tên trạng thái đơn hiển thị tiếng Việt. */
 fun tenTrangThaiDon(tt: String): String = when (tt) {
-    "CHO_XU_LY" -> "Cho xu ly"
-    "DANG_LAM" -> "Dang lam"
-    "HOAN_THANH" -> "Hoan thanh"
-    "HUY" -> "Da huy"
+    "CHO_XU_LY" -> "Chờ xử lý"
+    "DANG_LAM" -> "Đang làm"
+    "HOAN_THANH" -> "Hoàn thành"
+    "HUY" -> "Đã hủy"
     else -> tt
 }
 
-/** Man Don hang v3: hien ten KH + SDT goi nhanh + sap xep + loc. */
+/** Màn Đơn hàng v3: hiện tên KH + SĐT gọi nhanh + sắp xếp + lọc. */
 @Composable
 fun ManHinhDonHang(
     vm: DonHangViewModel = hiltViewModel(),
@@ -62,7 +62,7 @@ fun ManHinhDonHang(
     val tb by vm.thongBao.collectAsState()
     var loc by remember { mutableStateOf<String?>(null) }
     var tk by remember { mutableStateOf("") }
-    var sapXep by remember { mutableStateOf(0) } // 0 moi nhat, 1 no nhieu, 2 thanh toan lon
+    var sapXep by remember { mutableStateOf(0) } // 0 mới nhất, 1 nợ nhiều, 2 thanh toán lớn
     val mapKh = dsKh.associateBy { it.id }
     val ctx = LocalContext.current
 
@@ -81,28 +81,28 @@ fun ManHinhDonHang(
     val noLoc = dsLoc.sumOf { it.conNo }
 
     Scaffold(floatingActionButton = {
-        FloatingActionButton(onClick = onTaoDon) { Icon(Icons.Filled.Add, contentDescription = "Tao don") }
+        FloatingActionButton(onClick = onTaoDon) { Icon(Icons.Filled.Add, contentDescription = "Tạo đơn") }
     }) { dem ->
         Column(
             Modifier.fillMaxSize().padding(dem).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text("Don hang (${ds.size})", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-            Text("Tong loc: ${dinhDangTien(tongLoc)} - Con no: ${dinhDangTien(noLoc)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+            Text("Đơn hàng (${ds.size})", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Text("Tổng lọc: ${dinhDangTien(tongLoc)} - Còn nợ: ${dinhDangTien(noLoc)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
             if (tb.isNotEmpty()) Card { Text(tb, Modifier.padding(12.dp)) }
-            OTimKiem(tk, { tk = it }, "Tim theo ma don / ten KH / SDT...")
+            OTimKiem(tk, { tk = it }, "Tìm theo mã đơn / tên KH / SĐT...")
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf(null to "Tat ca", "CHO_XU_LY" to "Cho", "DANG_LAM" to "Dang lam", "HOAN_THANH" to "Xong", "HUY" to "Huy").forEach { (ma, ten) ->
+                listOf(null to "Tất cả", "CHO_XU_LY" to "Chờ", "DANG_LAM" to "Đang làm", "HOAN_THANH" to "Xong", "HUY" to "Hủy").forEach { (ma, ten) ->
                     AssistChip(onClick = { loc = ma }, label = { Text((if (loc == ma) "✓ " else "") + ten) })
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("Moi nhat", "No nhieu", "Tien lon").forEachIndexed { i, ten ->
+                listOf("Mới nhất", "Nợ nhiều", "Tiền lớn").forEachIndexed { i, ten ->
                     AssistChip(onClick = { sapXep = i }, label = { Text((if (sapXep == i) "✓ " else "") + ten) })
                 }
             }
             if (dsLoc.isEmpty()) {
-                OTrong("Khong co don nao", "Bam + de tao don moi cho khach.")
+                OTrong("Không có đơn nào", "Bấm + để tạo đơn mới cho khách.")
             } else {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(dsLoc, key = { it.id }) { don ->
@@ -116,11 +116,11 @@ fun ManHinhDonHang(
                                     Text(don.maDh, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                                     NhanTrangThai(don.trangThai, tenTrangThaiDon(don.trangThai), mauTrangThaiDon(don.trangThai))
                                 }
-                                Text("${kh?.hoTen ?: "KH le"} - ${kh?.sdt?.ifEmpty { "chua co SDT" } ?: ""}", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                Text("${kh?.hoTen ?: "KH lẻ"} - ${kh?.sdt?.ifEmpty { "chưa có SĐT" } ?: ""}", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                                 if (!kh?.diaChi.isNullOrEmpty()) Text(kh!!.diaChi, style = MaterialTheme.typography.bodySmall)
-                                Text("${dinhDangNgay(don.ngayTao)} - Thanh toan: ${dinhDangTien(don.tongThanhToan)}", style = MaterialTheme.typography.bodySmall)
+                                Text("${dinhDangNgay(don.ngayTao)} - Thanh toán: ${dinhDangTien(don.tongThanhToan)}", style = MaterialTheme.typography.bodySmall)
                                 Text(
-                                    "Da thu: ${dinhDangTien(don.daThu)} - Con no: ${dinhDangTien(don.conNo)}",
+                                    "Đã thu: ${dinhDangTien(don.daThu)} - Còn nợ: ${dinhDangTien(don.conNo)}",
                                     color = if (don.conNo > 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
                                     fontWeight = FontWeight.SemiBold,
                                 )
@@ -129,8 +129,8 @@ fun ManHinhDonHang(
                                         IconButton(onClick = {
                                             val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${kh!!.sdt}"))
                                             ctx.startActivity(intent)
-                                        }) { Icon(Icons.Filled.Phone, contentDescription = "Goi KH") }
-                                        Text("Bam de mo chi tiet / thu tien", style = MaterialTheme.typography.bodySmall, modifier = Modifier.align(Alignment.CenterVertically))
+                                        }) { Icon(Icons.Filled.Phone, contentDescription = "Gọi KH") }
+                                        Text("Bấm để mở chi tiết / thu tiền", style = MaterialTheme.typography.bodySmall, modifier = Modifier.align(Alignment.CenterVertically))
                                     }
                                 }
                             }

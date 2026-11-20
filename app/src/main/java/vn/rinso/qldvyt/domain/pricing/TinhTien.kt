@@ -5,6 +5,12 @@ import kotlin.math.roundToLong
 /**
  * Công thức tính tiền tập trung của QLDVYT (nguồn chân lý duy nhất).
  * Mọi tiền là Long (VNĐ). Xem docs/03-cong-thuc-tinh-tien.md
+ *
+ * Quy ước thuế VAT đơn hàng:
+ *   tienTruocVat = max(0, tongTienHang - giamGia)
+ *   tienVat      = round(tienTruocVat * tyLeVat) nếu bật VAT, ngược lại 0
+ *   tongThanhToan = tienTruocVat + tienVat
+ * Nếu tính theo từng dịch vụ: tienVat = Σ round(thanhTien_i * tyLeVat) với i chịu thuế.
  */
 object TinhTien {
 
@@ -14,9 +20,36 @@ object TinhTien {
         return (tongGia * tyLeHuong.coerceIn(0.0, 1.0)).roundToLong()
     }
 
-    /** Tổng thanh toán đơn hàng = max(0, tongTienHang - giamGia). */
+    /** Tổng thanh toán đơn hàng KHÔNG VAT (giữ tương thích cũ). */
     fun tongThanhToan(tongTienHang: Long, giamGia: Long): Long =
         maxOf(0L, tongTienHang - maxOf(0L, giamGia))
+
+    /** Tiền hàng trước VAT sau giảm giá. */
+    fun tienTruocVat(tongTienHang: Long, giamGia: Long): Long =
+        maxOf(0L, tongTienHang - maxOf(0L, giamGia))
+
+    /** Tiền VAT của đơn (gộp cả đơn). Tắt VAT hoặc tỷ lệ <= 0 thì trả 0. */
+    fun tienVatDon(tienTruocVat: Long, tyLeVat: Double, batVat: Boolean): Long {
+        if (!batVat || tienTruocVat <= 0 || tyLeVat <= 0) return 0L
+        return (tienTruocVat * tyLeVat.coerceIn(0.0, 0.2)).roundToLong()
+    }
+
+    /** Tiền VAT tính theo từng dòng (chỉ dòng chịu thuế mới cộng). */
+    fun tienVatTheoDong(
+        cacDong: List<Pair<Long, Boolean>>,
+        tyLeVat: Double,
+        batVat: Boolean,
+    ): Long {
+        if (!batVat || tyLeVat <= 0) return 0L
+        val tyLe = tyLeVat.coerceIn(0.0, 0.2)
+        return cacDong.filter { it.second }.sumOf { (thanhTien, _) ->
+            if (thanhTien <= 0) 0L else (thanhTien * tyLe).roundToLong()
+        }
+    }
+
+    /** Tổng thanh toán đã gồm VAT. */
+    fun tongThanhToanCoVat(tienTruocVat: Long, tienVat: Long): Long =
+        maxOf(0L, tienTruocVat + maxOf(0L, tienVat))
 
     /** Công nợ đơn = tongThanhToan - daThu. */
     fun conNo(tongThanhToan: Long, daThu: Long): Long = tongThanhToan - daThu
@@ -31,7 +64,13 @@ object TinhTien {
         return (luongCoBan * tongCong / congChuan).roundToLong()
     }
 
-    /** Thực lĩnh tháng. */
+    /** Thuế TNCN khấu trừ trên thu nhập chịu thuế (nếu bật). */
+    fun thueTncn(thuNhapChiuThue: Long, tyLe: Double, bat: Boolean): Long {
+        if (!bat || thuNhapChiuThue <= 0 || tyLe <= 0) return 0L
+        return (thuNhapChiuThue * tyLe.coerceIn(0.0, 0.35)).roundToLong()
+    }
+
+    /** Thực lĩnh tháng (có thuế TNCN khấu trừ). */
     fun thucLinh(
         luongTheoCong: Long,
         tienNhiemVu: Long,
@@ -40,9 +79,10 @@ object TinhTien {
         chuyenCan: Long,
         tamUng: Long,
         khauTruKhac: Long,
+        thueTncn: Long = 0L,
     ): Long = maxOf(
         0L,
-        luongTheoCong + tienNhiemVu + hoaHong + thuong + chuyenCan - tamUng - khauTruKhac
+        luongTheoCong + tienNhiemVu + hoaHong + thuong + chuyenCan - tamUng - khauTruKhac - maxOf(0L, thueTncn)
     )
 
     /** Điều kiện chuyên cần: đủ công chuẩn + không đi muộn. */

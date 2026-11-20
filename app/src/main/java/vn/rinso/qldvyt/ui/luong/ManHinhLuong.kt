@@ -1,5 +1,7 @@
 package vn.rinso.qldvyt.ui.luong
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -30,7 +32,7 @@ import vn.rinso.qldvyt.ui.common.DuongDanCongThuc
 import vn.rinso.qldvyt.ui.common.NhanTrangThai
 import vn.rinso.qldvyt.ui.common.OTrong
 
-/** Màn Lương v3: diễn giải công thức từng dòng + chốt/mở khóa. */
+/** Màn Lương v3: diễn giải công thức từng dòng + chốt/mở khóa + xuất PDF. */
 @Composable
 fun ManHinhLuong(vm: LuongViewModel = hiltViewModel()) {
     val thang by vm.thang.collectAsState()
@@ -39,6 +41,13 @@ fun ManHinhLuong(vm: LuongViewModel = hiltViewModel()) {
     val tb by vm.thongBao.collectAsState()
     var moDienGiai by remember { mutableStateOf<String?>(null) }
     val tong = ds.sumOf { it.thucLinh }
+    var nvXuat by remember { mutableStateOf<String?>(null) }
+    val chonPhieu = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")) { uri ->
+        if (uri != null && nvXuat != null) vm.xuatPhieuLuong(nvXuat!!, uri)
+    }
+    val chonBang = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")) { uri ->
+        if (uri != null) vm.xuatBangTongHop(uri)
+    }
 
     Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text("Bảng lương $thang/$nam (${ds.size} NV)", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
@@ -59,6 +68,10 @@ fun ManHinhLuong(vm: LuongViewModel = hiltViewModel()) {
             }
         }
         Button(onClick = { vm.tinhCaThang() }, modifier = Modifier.fillMaxWidth()) { Text("Tính lương cả tháng") }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = { chonBang.launch("bang-luong-$thang-$nam.pdf") }, modifier = Modifier.weight(1f), enabled = ds.isNotEmpty()) { Text("Xuất bảng tổng hợp PDF") }
+        }
+        Text("Bấm vào từng NV có nút xuất phiếu lương PDF (gồm phụ cấp + thuế TNCN theo Cài đặt).", style = MaterialTheme.typography.bodySmall)
         if (ds.isEmpty()) {
             OTrong("Chưa có bảng lương", "Chấm công + hoàn thành nhiệm vụ rồi bấm Tính cả tháng.")
         } else {
@@ -99,6 +112,10 @@ fun ManHinhLuong(vm: LuongViewModel = hiltViewModel()) {
                                 else OutlinedButton(onClick = { vm.moKhoa(bl.nhanVienId) }) { Text("Mở khóa (admin)") }
                                 OutlinedButton(onClick = { moDienGiai = if (mo) null else bl.id }) { Text(if (mo) "Ẩn" else "Xem công thức") }
                             }
+                            OutlinedButton(
+                                onClick = { nvXuat = bl.nhanVienId; chonPhieu.launch("phieu-luong-${vm.tenNv(bl.nhanVienId).substringBefore(" ")}-$thang-$nam.pdf") },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) { Text("Xuất phiếu lương PDF") }
                         }
                     }
                 }

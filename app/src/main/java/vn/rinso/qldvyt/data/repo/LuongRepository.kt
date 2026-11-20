@@ -41,18 +41,28 @@ class LuongRepository @Inject constructor(
         val luongTheoCong = TinhTien.luongTheoCong(luongChuan, tongCong, congChuan)
         val tienNv = db.nhiemVuDao().tienNhiemVuKy(nhanVienId, tu, den)
         val thuong = db.thuongPhatDao().tongThuong(nhanVienId, tu, den)
-        val phat = db.thuongPhatDao().tongPhat(nhanVienId, tu, den)
+        val phatCoDinh = db.thuongPhatDao().tongPhat(nhanVienId, tu, den)
         val tamUng = db.tamUngDao().tongTamUng(nhanVienId, tu, den)
         val duChuyenCan = TinhTien.duDieuKienChuyenCan(tongCong, congChuan, soNgayMuon)
         val chuyenCan = if (duChuyenCan) (capBac?.chuyenCanMuc ?: 0L) else 0L
-        // Hoa hồng: tạm tính 0 ở P4 (mở rộng P5: % trên đơn giới thiệu). Giữ cột để tương thích docs/02.
-        val hoaHong = 0L
-        val thucLinh = TinhTien.thucLinh(luongTheoCong, tienNv, hoaHong, thuong, chuyenCan, tamUng, phat)
+        val phuCap = try { caiDat.phuCapMacDinh.first() } catch (_: Exception) { 0L }
+        val phatMuonMoiNgay = try { caiDat.phatDiMuon.first() } catch (_: Exception) { 0L }
+        val phatDiMuon = soNgayMuon * phatMuonMoiNgay
+        val khauTruKhac = phatCoDinh + phatDiMuon
+        val tyLeHoaHong = try { caiDat.hoaHongMacDinh.first() } catch (_: Exception) { 0.0 }
+        // Hoa hồng theo % nhiệm vụ hoàn thành (nếu cài đặt > 0)
+        val hoaHong = if (tyLeHoaHong > 0) (tienNv * tyLeHoaHong).toLong() else 0L
+        val thueBat = try { caiDat.thueTncnBat.first() } catch (_: Exception) { false }
+        val tyLeThue = try { caiDat.thueTncnMacDinh.first() } catch (_: Exception) { 0.0 }
+        val thuNhapChiuThue = maxOf(0L, luongTheoCong + tienNv + hoaHong + thuong + chuyenCan + phuCap)
+        val thueTncn = TinhTien.thueTncn(thuNhapChiuThue, tyLeThue, thueBat)
+        val thucLinh = TinhTien.thucLinh(luongTheoCong, tienNv, hoaHong, thuong, chuyenCan + phuCap, tamUng, khauTruKhac, thueTncn)
         val cu = db.bangLuongDao().theoNvKy(nhanVienId, thang, nam)
-        return (cu ?: BangLuong(UUID.randomUUID().toString(), nhanVienId, thang, nam)).copy(
+        return (cu ?: BangLuong(java.util.UUID.randomUUID().toString(), nhanVienId, thang, nam)).copy(
             luongCoBan = luongChuan, tongCong = tongCong, tienNhiemVu = tienNv,
             hoaHong = hoaHong, thuong = thuong, chuyenCan = chuyenCan,
-            tamUng = tamUng, khauTruKhac = phat, thucLinh = thucLinh,
+            phuCap = phuCap, tamUng = tamUng, khauTruKhac = khauTruKhac,
+            thueTncn = thueTncn, thucLinh = thucLinh,
         )
     }
 

@@ -210,7 +210,7 @@ suspend fun seedNeuChuaCo(db: QldvytDatabase, caiDat: CaiDat) {
             val giam = if (i % 3 == 0) 50_000L else 0L
             val tt = TinhTien.tongThanhToan(gia, giam)
             val donId = uuid()
-            donDao.them(DonHang(donId, "DH%04d%02d-%03d".format(nam, thang + 1, i + 1), dsKh[kIdx].id, millis(ngay), null, "HOAN_THANH", gia, giam, tt, tt, 0L, "Thu đủ"))
+            donDao.them(DonHang(id = donId, maDh = "DH%04d%02d-%03d".format(nam, thang + 1, i + 1), khachHangId = dsKh[kIdx].id, ngayTao = millis(ngay), ngayHen = null, trangThai = "HOAN_THANH", tongTienHang = gia, giamGia = giam, tienVat = 0L, tyLeVat = 0.0, tongThanhToan = tt, daThu = tt, conNo = 0L, ghiChu = "Thu đủ"))
             ctDao.them(DonHangChiTiet(uuid(), donId, dichVuId = dvId, tenHienThi = ten, soLuong = 1.0, donGia = gia, thanhTien = gia))
             ttDao.them(ThanhToan(uuid(), donId, dsKh[kIdx].id, millis(ngay, 15), tt, if (i % 2 == 0) "TIENMAT" else "CK", null, "Thu đủ"))
         }
@@ -226,7 +226,7 @@ suspend fun seedNeuChuaCo(db: QldvytDatabase, caiDat: CaiDat) {
             val tong = gia * 2 // 2 ca/buổi
             val donId = uuid()
             val daThu = if (i == 0) 400_000L else if (i == 1) 500_000L else 200_000L
-            donDao.them(DonHang(donId, "DH-NO-%03d".format(i + 1), dsKh[kIdx].id, millis(ngay), null, "DANG_LAM", tong, 0L, tong, daThu, tong - daThu, "Khách trả góp"))
+            donDao.them(DonHang(id = donId, maDh = "DH-NO-%03d".format(i + 1), khachHangId = dsKh[kIdx].id, ngayTao = millis(ngay), ngayHen = null, trangThai = "DANG_LAM", tongTienHang = tong, giamGia = 0L, tienVat = 0L, tyLeVat = 0.0, tongThanhToan = tong, daThu = daThu, conNo = tong - daThu, ghiChu = "Khách trả góp"))
             ctDao.them(DonHangChiTiet(uuid(), donId, dichVuId = dvId, tenHienThi = ten, soLuong = 2.0, donGia = gia, thanhTien = tong))
             ttDao.them(ThanhToan(uuid(), donId, dsKh[kIdx].id, millis(ngay, 15), daThu / 2, "TIENMAT", null, "Đặt cọc lần 1"))
             ttDao.them(ThanhToan(uuid(), donId, dsKh[kIdx].id, millis(ngay, 18), daThu - daThu / 2, "CK", null, "Thu lần 2"))
@@ -235,14 +235,14 @@ suspend fun seedNeuChuaCo(db: QldvytDatabase, caiDat: CaiDat) {
         listOf(Triple(11, 21, "dv-di-xe"), Triple(12, 22, "dv-tu-van")).forEachIndexed { i, (kIdx, ngay, dvId) ->
             val (ten, gia) = dv(dvId)
             val donId = uuid()
-            donDao.them(DonHang(donId, "DH-CHO-%03d".format(i + 1), dsKh[kIdx].id, millis(ngay), null, "CHO_XU_LY", gia, 0L, gia, 0L, gia, "Chờ xác nhận"))
+            donDao.them(DonHang(id = donId, maDh = "DH-CHO-%03d".format(i + 1), khachHangId = dsKh[kIdx].id, ngayTao = millis(ngay), ngayHen = null, trangThai = "CHO_XU_LY", tongTienHang = gia, giamGia = 0L, tienVat = 0L, tyLeVat = 0.0, tongThanhToan = gia, daThu = 0L, conNo = gia, ghiChu = "Chờ xác nhận"))
             ctDao.them(DonHangChiTiet(uuid(), donId, dichVuId = dvId, tenHienThi = ten, soLuong = 1.0, donGia = gia, thanhTien = gia))
         }
         // 2 đơn hủy
         listOf(Triple(13, 5, "dv-giay-to"), Triple(14, 7, "dv-huyet-ap")).forEachIndexed { i, (kIdx, ngay, dvId) ->
             val (ten, gia) = dv(dvId)
             val donId = uuid()
-            donDao.them(DonHang(donId, "DH-HUY-%03d".format(i + 1), dsKh[kIdx].id, millis(ngay), null, "HUY", gia, 0L, gia, 0L, 0L, "Khách hủy"))
+            donDao.them(DonHang(id = donId, maDh = "DH-HUY-%03d".format(i + 1), khachHangId = dsKh[kIdx].id, ngayTao = millis(ngay), ngayHen = null, trangThai = "HUY", tongTienHang = gia, giamGia = 0L, tienVat = 0L, tyLeVat = 0.0, tongThanhToan = gia, daThu = 0L, conNo = 0L, ghiChu = "Khách hủy"))
             ctDao.them(DonHangChiTiet(uuid(), donId, dichVuId = dvId, tenHienThi = ten, soLuong = 1.0, donGia = gia, thanhTien = gia))
         }
         // Vật tư cho 5 đơn đầu

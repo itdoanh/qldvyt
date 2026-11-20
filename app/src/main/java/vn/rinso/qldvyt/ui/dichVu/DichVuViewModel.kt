@@ -29,14 +29,22 @@ class DichVuViewModel @Inject constructor(
     val dsChiTiet = chiTietDao.tatCa().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val thongBao = MutableStateFlow("")
 
-    fun themDichVu(ten: String, gia: Long, donVi: String, nhom: String = "KHAC") = viewModelScope.launch {
+    fun themDichVu(ten: String, gia: Long, donVi: String, nhom: String = "KHAC", chiuThue: Boolean = true) = viewModelScope.launch {
         runCatching {
             require(ten.isNotBlank()) { "Nhập tên dịch vụ" }
             require(gia >= 0) { "Giá phải >= 0" }
             val ma = "DV" + (System.currentTimeMillis() % 100000)
-            dvDao.them(DichVu(UUID.randomUUID().toString(), ma, ten.trim(), "", gia, donVi.ifBlank { "lần" }, "DANGBAN", nhom))
+            dvDao.them(DichVu(UUID.randomUUID().toString(), ma, ten.trim(), "", gia, donVi.ifBlank { "lần" }, "DANGBAN", nhom, chiuThue = chiuThue))
             thongBao.value = "Đã thêm dịch vụ $ten"
         }.onFailure { thongBao.value = it.message ?: "Thêm thất bại" }
+    }
+
+    /** Bật/tắt chịu thuế VAT cho từng dịch vụ (áp cho đơn mới). */
+    fun doiChiuThue(dv: DichVu, chiuThue: Boolean) = viewModelScope.launch {
+        runCatching {
+            dvDao.sua(dv.copy(chiuThue = chiuThue))
+            thongBao.value = if (chiuThue) "Đã bật VAT cho ${dv.ten}" else "Đã tắt VAT cho ${dv.ten}"
+        }.onFailure { thongBao.value = it.message ?: "Cập nhật thất bại" }
     }
 
     fun themGoi(ten: String, gia: Long) = viewModelScope.launch {

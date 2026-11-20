@@ -40,21 +40,21 @@ import vn.rinso.qldvyt.ui.common.OTrong
 import vn.rinso.qldvyt.ui.common.mauTrangThaiViec
 
 fun tenLoaiViec(loai: String): String = when (loai) {
-    "TIEM_TRUYEN" -> "Tiem truyen"
-    "THAY_BANG" -> "Thay bang"
-    "THU_TUC" -> "Lam thu tuc"
-    else -> "Viec khac"
+    "TIEM_TRUYEN" -> "Tiêm truyền"
+    "THAY_BANG" -> "Thay băng"
+    "THU_TUC" -> "Làm thủ tục"
+    else -> "Việc khác"
 }
 
 fun tenTrangThaiViec(tt: String): String = when (tt) {
-    "DAGIAO" -> "Da giao"
-    "DANGLAM" -> "Dang lam"
-    "HOANTHANH" -> "Hoan thanh"
-    "HUY" -> "Da huy"
+    "DAGIAO" -> "Đã giao"
+    "DANGLAM" -> "Đang làm"
+    "HOANTHANH" -> "Hoàn thành"
+    "HUY" -> "Đã hủy"
     else -> tt
 }
 
-/** Man Nhiem vu v3: Kanban mini + ten NV that + goi y NV ranh + tien 30%. */
+/** Màn Nhiệm vụ v3: Kanban mini + tên NV thật + gợi ý NV rảnh + tiền 30%. */
 @Composable
 fun ManHinhNhiemVu(vm: NhiemVuViewModel = hiltViewModel()) {
     val dsViec by vm.dsViec.collectAsState()
@@ -70,7 +70,7 @@ fun ManHinhNhiemVu(vm: NhiemVuViewModel = hiltViewModel()) {
     var loaiChon by remember { mutableStateOf("TIEM_TRUYEN") }
 
     val mapNv = dsNv.associateBy { it.id }
-    // Goi y NV ranh: dem viec chua xong cua tung NV
+    // Gợi ý NV rảnh: đếm việc chưa xong của từng NV
     val viecDangLam = dsViec.filter { it.trangThai == "DAGIAO" || it.trangThai == "DANGLAM" }
         .groupingBy { it.nhanVienId }.eachCount()
     val nvGoiY = dsNv.sortedBy { viecDangLam[it.id] ?: 0 }.take(3)
@@ -84,15 +84,15 @@ fun ManHinhNhiemVu(vm: NhiemVuViewModel = hiltViewModel()) {
     val tongTienNv = dsViec.filter { it.trangThai == "HOANTHANH" }.sumOf { it.tienNvHuong }
 
     Scaffold(floatingActionButton = {
-        FloatingActionButton(onClick = { hienForm = !hienForm }) { Icon(Icons.Filled.Add, contentDescription = "Giao viec") }
+        FloatingActionButton(onClick = { hienForm = !hienForm }) { Icon(Icons.Filled.Add, contentDescription = "Giao việc") }
     }) { dem ->
         Column(Modifier.fillMaxSize().padding(dem).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("Nhiem vu (${dsViec.size}) - NV huong ${(tyLeMacDinh * 100).toInt()}%", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Text("Nhiệm vụ (${dsViec.size}) - NV hưởng ${(tyLeMacDinh * 100).toInt()}%", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             Card {
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    HangTienTrinh("Hoan thanh $xong/${dsViec.size} - Tien NV ${dinhDangTien(tongTienNv)}", tyLeXong, MaterialTheme.colorScheme.primary)
+                    HangTienTrinh("Hoàn thành $xong/${dsViec.size} - Tiền NV ${dinhDangTien(tongTienNv)}", tyLeXong, MaterialTheme.colorScheme.primary)
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf("DAGIAO" to "Da giao", "DANGLAM" to "Dang lam", "HOANTHANH" to "Xong", "HUY" to "Huy").forEach { (ma, ten) ->
+                        listOf("DAGIAO" to "Đã giao", "DANGLAM" to "Đang làm", "HOANTHANH" to "Xong", "HUY" to "Hủy").forEach { (ma, ten) ->
                             item {
                                 val sl = dsViec.count { it.trangThai == ma }
                                 AssistChip(onClick = { loc = if (loc == ma) null else ma }, label = { Text("$ten ($sl)") })
@@ -102,38 +102,38 @@ fun ManHinhNhiemVu(vm: NhiemVuViewModel = hiltViewModel()) {
                 }
             }
             if (tb.isNotEmpty()) Card { Text(tb, Modifier.padding(12.dp)) }
-            OTimKiem(tk, { tk = it }, "Tim theo ten viec / ma viec")
+            OTimKiem(tk, { tk = it }, "Tìm theo tên việc / mã việc")
             if (hienForm) {
                 Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
                     Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Giao viec moi", fontWeight = FontWeight.Bold)
-                        if (dsNv.isEmpty()) Text("Chua co NV dang lam.")
+                        Text("Giao việc mới", fontWeight = FontWeight.Bold)
+                        if (dsNv.isEmpty()) Text("Chưa có NV đang làm.")
                         else {
-                            Text("Goi y NV ranh: " + nvGoiY.joinToString { "${it.hoTen} (${viecDangLam[it.id] ?: 0} viec)" })
+                            Text("Gợi ý NV rảnh: " + nvGoiY.joinToString { "${it.hoTen} (${viecDangLam[it.id] ?: 0} việc)" })
                             dsNv.take(12).forEach { nv ->
                                 AssistChip(onClick = { nvChon = nv.id }, label = { Text((if (nvChon == nv.id) "✓ " else "") + "${nv.hoTen} - ${nv.maNv} (${viecDangLam[nv.id] ?: 0})") })
                             }
                         }
-                        OutlinedTextField(oTen, { oTen = it }, label = { Text("Ten cong viec (*)") }, modifier = Modifier.fillMaxWidth())
+                        OutlinedTextField(oTen, { oTen = it }, label = { Text("Tên công việc (*)") }, modifier = Modifier.fillMaxWidth())
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             listOf("TIEM_TRUYEN", "THAY_BANG", "THU_TUC", "KHAC").forEach { loai ->
                                 AssistChip(onClick = { loaiChon = loai }, label = { Text((if (loaiChon == loai) "✓ " else "") + tenLoaiViec(loai)) })
                             }
                         }
-                        OutlinedTextField(oGia, { oGia = it.filter(Char::isDigit) }, label = { Text("Tong gia (VND)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                        OutlinedTextField(oGia, { oGia = it.filter(Char::isDigit) }, label = { Text("Tổng giá (VNĐ)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
                         val giaLong = oGia.toLongOrNull() ?: 0L
-                        if (giaLong > 0) Text("NV se huong: ${dinhDangTien((giaLong * tyLeMacDinh).toLong())} (${(tyLeMacDinh * 100).toInt()}%)", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                        if (giaLong > 0) Text("NV sẽ hưởng: ${dinhDangTien((giaLong * tyLeMacDinh).toLong())} (${(tyLeMacDinh * 100).toInt()}%)", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                         Button(onClick = {
                             if (nvChon != null) {
                                 vm.giaoViec(nvChon!!, oTen, loaiChon, giaLong, tyLeMacDinh)
                                 oTen = ""; oGia = ""; hienForm = false
                             }
-                        }, enabled = nvChon != null, modifier = Modifier.fillMaxWidth()) { Text("Giao viec") }
+                        }, enabled = nvChon != null, modifier = Modifier.fillMaxWidth()) { Text("Giao việc") }
                     }
                 }
             }
             if (dsLoc.isEmpty()) {
-                OTrong("Khong co nhiem vu", "Bam + de giao viec moi.")
+                OTrong("Không có nhiệm vụ", "Bấm + để giao việc mới.")
             } else {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(dsLoc, key = { it.id }) { viec ->
@@ -144,17 +144,17 @@ fun ManHinhNhiemVu(vm: NhiemVuViewModel = hiltViewModel()) {
                                     Text(viec.tenCongViec, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                                     NhanTrangThai(viec.trangThai, tenTrangThaiViec(viec.trangThai), mauTrangThaiViec(viec.trangThai))
                                 }
-                                Text("$tenNv - ${viec.maViec} - ${tenLoaiViec(viec.loai)} - Gia: ${dinhDangTien(viec.tongGia)}", style = MaterialTheme.typography.bodySmall)
+                                Text("$tenNv - ${viec.maViec} - ${tenLoaiViec(viec.loai)} - Giá: ${dinhDangTien(viec.tongGia)}", style = MaterialTheme.typography.bodySmall)
                                 if (viec.trangThai == "HOANTHANH") {
-                                    Text("NV huong: ${dinhDangTien(viec.tienNvHuong)} (${(viec.tyLeHuong * 100).toInt()}%)", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                                    Text("NV hưởng: ${dinhDangTien(viec.tienNvHuong)} (${(viec.tyLeHuong * 100).toInt()}%)", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                                 } else if (viec.tongGia > 0) {
-                                    Text("Du kien NV huong: ${dinhDangTien((viec.tongGia * viec.tyLeHuong).toLong())}", style = MaterialTheme.typography.bodySmall)
+                                    Text("Dự kiến NV hưởng: ${dinhDangTien((viec.tongGia * viec.tyLeHuong).toLong())}", style = MaterialTheme.typography.bodySmall)
                                 }
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    if (viec.trangThai == "DAGIAO") OutlinedButton(onClick = { vm.nhanViec(viec.id) }) { Text("Nhan viec") }
+                                    if (viec.trangThai == "DAGIAO") OutlinedButton(onClick = { vm.nhanViec(viec.id) }) { Text("Nhận việc") }
                                     if (viec.trangThai == "DAGIAO" || viec.trangThai == "DANGLAM") {
-                                        Button(onClick = { vm.hoanThanh(viec.id) }) { Text("Hoan thanh") }
-                                        OutlinedButton(onClick = { vm.huy(viec.id) }) { Text("Huy") }
+                                        Button(onClick = { vm.hoanThanh(viec.id) }) { Text("Hoàn thành") }
+                                        OutlinedButton(onClick = { vm.huy(viec.id) }) { Text("Hủy") }
                                     }
                                 }
                             }

@@ -8,6 +8,7 @@ import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import vn.rinso.qldvyt.data.local.DonHang
 import vn.rinso.qldvyt.data.local.DonHangChiTiet
 import vn.rinso.qldvyt.data.local.DonHangVatTu
@@ -22,6 +23,8 @@ data class MatHangMoi(
     val tenHienThi: String,
     val soLuong: Double = 1.0,
     val donGia: Long,
+    /** Dòng này có chịu VAT không (mặc định theo dịch vụ). */
+    val chiuThue: Boolean = true,
 )
 
 /** Vật tư dùng cho đơn: trừ tồn kho + snapshot giá vốn. */
@@ -36,7 +39,10 @@ data class VatTuDungMoi(
  * Công thức duy nhất từ TinhTien (docs/03).
  */
 @Singleton
-class DonHangRepository @Inject constructor(private val db: QldvytDatabase) {
+class DonHangRepository @Inject constructor(
+    private val db: QldvytDatabase,
+    private val caiDat: vn.rinso.qldvyt.data.prefs.CaiDat,
+) {
 
     fun moiNhat(): Flow<List<DonHang>> = db.donHangDao().moiNhat()
 
@@ -68,14 +74,35 @@ class DonHangRepository @Inject constructor(private val db: QldvytDatabase) {
         val donId = UUID.randomUUID().toString()
         val maDh = sinhMaDon()
         val tongTienHang = matHang.sumOf { (it.soLuong * it.donGia).toLong() }
-        val tongThanhToan = TinhTien.tongThanhToan(tongTienHang, giamGia)
+        val truocVat = TinhTien.tienTruocVat(tongTienHang, giamGia)
+        // Đọc setting VAT: công tắc toàn hệ thống + áp cho đơn + theo từng dịch vụ
+        val vatBatHeThong = try { caiDat.vatBatToanHeThong.first() } catch (_: Exception) { false }
+        val vatApDungDon = try { caiDat.vatApDungDonHang.first() } catch (_: Exception) { true }
+        val vatTheoDv = try { caiDat.vatTheoTungDichVu.first() } catch (_: Exception) { true }
+        val vatMacDinh = try { caiDat.vatMacDinh.first() } catch (_: Exception) { 0.08 }
+        val batVat = vatBatHeThong && vatApDungDon
+        val tienVat = if (!batVat) 0L else if (vatTheoDv) {
+            val chiTietThue = matHang.map { m ->
+                val thanhTien = (m.soLuong * m.donGia).toLong()
+                // Giảm giá phân bổ đều: VAT tính trên (thanhTien - giam*tyTrong)
+                val tyTrong = if (tongTienHang > 0) thanhTien.toDouble() / tongTienHang else 0.0
+                val giamChoDong = (maxOf(0L, giamGia) * tyTrong).toLong()
+                (maxOf(0L, thanhTien - giamChoDong)) to m.chiuThue
+            }
+            TinhTien.tienVatTheoDong(chiTietThue, vatMacDinh, true)
+        } else {
+            TinhTien.tienVatDon(truocVat, vatMacDinh, true)
+        }
+        val tyLeVatAp = if (batVat) vatMacDinh else 0.0
+        val tongThanhToan = TinhTien.tongThanhToanCoVat(truocVat, tienVat)
         db.withTransaction {
             db.donHangDao().them(
                 DonHang(
                     id = donId, maDh = maDh, khachHangId = khachHangId,
                     ngayTao = System.currentTimeMillis(), ngayHen = ngayHen,
                     trangThai = "CHO_XU_LY", tongTienHang = tongTienHang,
-                    giamGia = giamGia, tongThanhToan = tongThanhToan,
+                    giamGia = giamGia, tienVat = tienVat, tyLeVat = tyLeVatAp,
+                    tongThanhToan = tongThanhToan,
                     daThu = 0L, conNo = tongThanhToan, ghiChu = ghiChu,
                 )
             )
@@ -87,6 +114,7 @@ class DonHangRepository @Inject constructor(private val db: QldvytDatabase) {
                         dichVuId = m.dichVuId, goiId = m.goiId,
                         tenHienThi = m.tenHienThi, soLuong = m.soLuong,
                         donGia = m.donGia, thanhTien = thanhTien,
+                        chiuThue = m.chiuThue,
                     )
                 )
             }

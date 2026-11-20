@@ -5,7 +5,7 @@ import androidx.room.RoomDatabase
 
 /**
  * Database local duy nhất của app (offline-first, không server).
- * Version 2: thêm cột `nhom` cho dich_vu (nhóm sổ doanh thu kiểu MISA).
+ * Version 3: VAT/thuế (dich_vu.chiuThue, don_hang.tienVat, bang_luong.thueTncn...).
  * Mọi thay đổi entity phải tăng version + viết Migration.
  * Xem docs/02-thiet-ke-database-room.md
  */
@@ -17,7 +17,7 @@ import androidx.room.RoomDatabase
         KhachHang::class, DonHang::class, DonHangChiTiet::class, DonHangVatTu::class,
         NhiemVu::class, ThanhToan::class, BangLuong::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 abstract class QldvytDatabase : RoomDatabase() {

@@ -1,6 +1,8 @@
 package vn.rinso.qldvyt.ui.donHang
 
 import android.content.Intent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -51,6 +53,8 @@ class ChiTietDonViewModel @Inject constructor(
     private val repo: DonHangRepository,
     private val donDao: DonHangDao,
     private val khDao: KhachHangDao,
+    private val pdf: vn.rinso.qldvyt.data.pdf.PdfExporter,
+    private val caiDat: vn.rinso.qldvyt.data.prefs.CaiDat,
 ) : ViewModel() {
     var don by mutableStateOf<DonHang?>(null)
         private set
@@ -92,9 +96,25 @@ class ChiTietDonViewModel @Inject constructor(
             tai(id)
         }.onFailure { tb = it.message ?: "Đổi thất bại" }
     }
+
+    /** Xuất hóa đơn PDF (có VAT theo cài đặt) ra file do người dùng chọn. */
+    fun xuatHoaDonPdf(uri: android.net.Uri) = viewModelScope.launch {
+        runCatching {
+            val d = don ?: error("Chưa tải đơn")
+            val ten = caiDat.tenCongTy.first()
+            val dc = caiDat.diaChiCongTy.first()
+            val sdt = caiDat.sdtCongTy.first()
+            val mst = caiDat.maSoThue.first()
+            pdf.xuatHoaDon(
+                uri, d, khach, chiTiet, lichSuThu,
+                vn.rinso.qldvyt.data.pdf.ThongTinCongTy(ten, dc, sdt, mst),
+            )
+            tb = "Đã xuất hóa đơn PDF ${d.maDh}"
+        }.onFailure { tb = it.message ?: "Xuất PDF thất bại" }
+    }
 }
 
-/** Chi tiet don v3: ten KH that + tien do thu + phieu thu share + lich su. */
+/** Chi tiết đơn: tên khách hàng thật + tiến độ thu + hóa đơn PDF + lịch sử. */
 @Composable
 fun ManHinhChiTietDon(donId: String, vm: ChiTietDonViewModel = hiltViewModel()) {
     LaunchedEffect(donId) { vm.tai(donId) }
@@ -102,10 +122,13 @@ fun ManHinhChiTietDon(donId: String, vm: ChiTietDonViewModel = hiltViewModel()) 
     val ctx = LocalContext.current
     var oTien by remember { mutableStateOf("") }
     var phuongThuc by remember { mutableStateOf("TIENMAT") }
+    val chonPdf = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/pdf")
+    ) { uri -> if (uri != null) vm.xuatHoaDonPdf(uri) }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         if (don == null) {
-            Text("Dang tai don...", style = MaterialTheme.typography.bodyLarge)
+            Text("Đang tải đơn...", style = MaterialTheme.typography.bodyLarge)
             if (vm.tb.isNotEmpty()) Text(vm.tb)
             return@Column
         }
@@ -113,82 +136,88 @@ fun ManHinhChiTietDon(donId: String, vm: ChiTietDonViewModel = hiltViewModel()) 
             Text(don.maDh, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
             NhanTrangThai(don.trangThai, tenTrangThaiDon(don.trangThai), mauTrangThaiDon(don.trangThai))
         }
-        Text("KH: ${vm.khach?.hoTen ?: "KH le"} - SDT: ${vm.khach?.sdt?.ifEmpty { "—" } ?: "—"}", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+        Text("Khách hàng: ${vm.khach?.hoTen ?: "Khách lẻ"} - SĐT: ${vm.khach?.sdt?.ifEmpty { "—" } ?: "—"}", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
         if (!vm.khach?.diaChi.isNullOrEmpty()) Text(vm.khach!!.diaChi, style = MaterialTheme.typography.bodySmall)
-        Text("${dinhDangNgay(don.ngayTao)}${don.ngayHen?.let { " - Hen: " + dinhDangNgay(it) } ?: ""}", style = MaterialTheme.typography.bodySmall)
+        Text("${dinhDangNgay(don.ngayTao)}${don.ngayHen?.let { " - Hẹn: " + dinhDangNgay(it) } ?: ""}", style = MaterialTheme.typography.bodySmall)
         if (vm.tb.isNotEmpty()) Card { Text(vm.tb, Modifier.padding(12.dp)) }
         Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
             Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("Tong hang: ${dinhDangTien(don.tongTienHang)} - Giam: ${dinhDangTien(don.giamGia)}")
-                Text("Thanh toan: ${dinhDangTien(don.tongThanhToan)}", fontWeight = FontWeight.Bold)
+                Text("Tổng tiền hàng: ${dinhDangTien(don.tongTienHang)} - Giảm giá: ${dinhDangTien(don.giamGia)}")
+                if (don.tienVat > 0) Text("Thuế VAT (${(don.tyLeVat * 100).toInt()}%): ${dinhDangTien(don.tienVat)}", fontWeight = FontWeight.SemiBold)
+                else Text("Thuế VAT: Không áp dụng", style = MaterialTheme.typography.bodySmall)
+                Text("Tổng thanh toán: ${dinhDangTien(don.tongThanhToan)}", fontWeight = FontWeight.Bold)
                 Text(
-                    "Da thu: ${dinhDangTien(don.daThu)} - Con no: ${dinhDangTien(don.conNo)}",
+                    "Đã thu: ${dinhDangTien(don.daThu)} - Còn nợ: ${dinhDangTien(don.conNo)}",
                     fontWeight = FontWeight.Bold,
                     color = if (don.conNo > 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
                 )
                 val tyLe = if (don.tongThanhToan > 0) don.daThu.toFloat() / don.tongThanhToan else 0f
-                HangTienTrinh("Tien do thu tien", tyLe, MaterialTheme.colorScheme.primary)
+                HangTienTrinh("Tiến độ thu tiền", tyLe, MaterialTheme.colorScheme.primary)
                 OutlinedButton(onClick = {
                     val noiDung = buildString {
-                        appendLine("PHIEU THU - RINSO QLDVYT")
+                        appendLine("PHIẾU THU - RINSO QLDVYT")
                         appendLine(don.maDh + " - " + dinhDangNgay(don.ngayTao))
                         appendLine("KH: ${vm.khach?.hoTen ?: ""} - ${vm.khach?.sdt ?: ""}")
-                        appendLine("Tong: ${dinhDangTien(don.tongThanhToan)} - Da thu: ${dinhDangTien(don.daThu)} - Con no: ${dinhDangTien(don.conNo)}")
-                        appendLine("Cam on quy khach!")
+                        appendLine("Tổng: ${dinhDangTien(don.tongThanhToan)} (VAT ${dinhDangTien(don.tienVat)}) - Đã thu: ${dinhDangTien(don.daThu)} - Còn nợ: ${dinhDangTien(don.conNo)}")
+                        appendLine("Cảm ơn quý khách!")
                     }
                     ctx.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
                         type = "text/plain"
                         putExtra(Intent.EXTRA_TEXT, noiDung)
-                    }, "Chia se phieu thu"))
-                }, modifier = Modifier.fillMaxWidth()) { Text("Chia se phieu thu (Zalo/SMS)") }
+                    }, "Chia sẻ phiếu thu"))
+                }, modifier = Modifier.fillMaxWidth()) { Text("Chia sẻ phiếu thu (Zalo/SMS)") }
+                Button(onClick = { chonPdf.launch("hoa-don-${don.maDh}.pdf") }, modifier = Modifier.fillMaxWidth()) { Text("Xuất hóa đơn PDF (có VAT)") }
             }
         }
-        Text("Mat hang (gia snapshot chong truot gia):", fontWeight = FontWeight.Bold)
+        Text("Mặt hàng (giá snapshot chống trượt giá):", fontWeight = FontWeight.Bold)
         vm.chiTiet.forEach { ct ->
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest)) {
                 Row(Modifier.padding(12.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("${ct.tenHienThi} x ${ct.soLuong.toInt()}", modifier = Modifier.weight(1f))
+                    Column(Modifier.weight(1f)) {
+                        Text("${ct.tenHienThi} x ${ct.soLuong.toInt()}", fontWeight = FontWeight.SemiBold)
+                        Text(if (ct.chiuThue) "Chịu VAT" else "Không chịu VAT", style = MaterialTheme.typography.bodySmall)
+                    }
                     Text(dinhDangTien(ct.thanhTien), fontWeight = FontWeight.Bold)
                 }
             }
         }
-        if (vm.chiTiet.isEmpty()) Text("Don chua co mat hang.", style = MaterialTheme.typography.bodySmall)
+        if (vm.chiTiet.isEmpty()) Text("Đơn chưa có mặt hàng.", style = MaterialTheme.typography.bodySmall)
         if (don.conNo > 0 && don.trangThai != "HUY") {
             Card {
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Thu tien (con no ${dinhDangTien(don.conNo)}):", fontWeight = FontWeight.Bold)
+                    Text("Thu tiền (còn nợ ${dinhDangTien(don.conNo)}):", fontWeight = FontWeight.Bold)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = { oTien = don.conNo.toString() }, modifier = Modifier.weight(1f)) { Text("Thu dung con no") }
+                        OutlinedButton(onClick = { oTien = don.conNo.toString() }, modifier = Modifier.weight(1f)) { Text("Thu đúng còn nợ") }
                         OutlinedButton(onClick = { oTien = (don.conNo / 2).toString() }, modifier = Modifier.weight(1f)) { Text("Thu 1/2") }
                     }
-                    OutlinedTextField(oTien, { oTien = it.filter(Char::isDigit) }, label = { Text("So tien (VND)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                    OutlinedTextField(oTien, { oTien = it.filter(Char::isDigit) }, label = { Text("Số tiền (VNĐ)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(onClick = { phuongThuc = "TIENMAT" }, modifier = Modifier.weight(1f)) {
-                            Text(if (phuongThuc == "TIENMAT") "✓ Tien mat" else "Tien mat")
+                            Text(if (phuongThuc == "TIENMAT") "✓ Tiền mặt" else "Tiền mặt")
                         }
                         OutlinedButton(onClick = { phuongThuc = "CK" }, modifier = Modifier.weight(1f)) {
-                            Text(if (phuongThuc == "CK") "✓ Chuyen khoan" else "Chuyen khoan")
+                            Text(if (phuongThuc == "CK") "✓ Chuyển khoản" else "Chuyển khoản")
                         }
                     }
                     Button(onClick = {
                         oTien.toLongOrNull()?.let { vm.thuTien(it, phuongThuc) }
                         oTien = ""
-                    }, modifier = Modifier.fillMaxWidth()) { Text("Xac nhan thu") }
+                    }, modifier = Modifier.fillMaxWidth()) { Text("Xác nhận thu") }
                 }
             }
         }
         if (vm.lichSuThu.isNotEmpty()) {
-            Text("Lich su thu (${vm.lichSuThu.size} lan):", fontWeight = FontWeight.Bold)
+            Text("Lịch sử thu tiền (${vm.lichSuThu.size} lần):", fontWeight = FontWeight.Bold)
             vm.lichSuThu.forEach { tt ->
-                Text("- ${dinhDangNgay(tt.ngay)}: ${dinhDangTien(tt.soTien)} (${if (tt.phuongThuc == "CK") "CK" else "Tien mat"})${if (tt.ghiChu.isNotEmpty()) " - ${tt.ghiChu}" else ""}")
+                Text("- ${dinhDangNgay(tt.ngay)}: ${dinhDangTien(tt.soTien)} (${if (tt.phuongThuc == "CK") "Chuyển khoản" else "Tiền mặt"})${if (tt.ghiChu.isNotEmpty()) " - ${tt.ghiChu}" else ""}")
             }
         }
-        Text("Doi trang thai:", fontWeight = FontWeight.Bold)
+        Text("Đổi trạng thái:", fontWeight = FontWeight.Bold)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = { vm.doiTrangThai("DANG_LAM") }) { Text("Dang lam") }
-            OutlinedButton(onClick = { vm.doiTrangThai("HOAN_THANH") }) { Text("Hoan thanh") }
-            OutlinedButton(onClick = { vm.doiTrangThai("HUY") }) { Text("Huy") }
+            OutlinedButton(onClick = { vm.doiTrangThai("DANG_LAM") }) { Text("Đang làm") }
+            OutlinedButton(onClick = { vm.doiTrangThai("HOAN_THANH") }) { Text("Hoàn thành") }
+            OutlinedButton(onClick = { vm.doiTrangThai("HUY") }) { Text("Hủy") }
         }
-        if (don.ghiChu.isNotEmpty()) Text("Ghi chu: ${don.ghiChu}", style = MaterialTheme.typography.bodySmall)
+        if (don.ghiChu.isNotEmpty()) Text("Ghi chú: ${don.ghiChu}", style = MaterialTheme.typography.bodySmall)
     }
 }
