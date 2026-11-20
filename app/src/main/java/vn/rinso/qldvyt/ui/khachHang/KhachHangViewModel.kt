@@ -14,14 +14,20 @@ import vn.rinso.qldvyt.data.local.KhachHang
 import vn.rinso.qldvyt.data.local.KhachHangDao
 import java.util.UUID
 
-/** ViewModel khách hàng: tìm theo tên/SĐT + thêm mới. */
+/** ViewModel khách hàng v3: tìm theo tên/SĐT + thêm mới + kèm đơn/nợ từng KH. */
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
-class KhachHangViewModel @Inject constructor(private val dao: KhachHangDao) : ViewModel() {
+class KhachHangViewModel @Inject constructor(
+    private val dao: KhachHangDao,
+    donDao: vn.rinso.qldvyt.data.local.DonHangDao,
+) : ViewModel() {
     val tuKhoa = MutableStateFlow("")
     val danhSach = tuKhoa.flatMapLatest { tk ->
         if (tk.isBlank()) dao.tatCa() else dao.timKiem(tk.trim())
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val dsDon = donDao.moiNhat()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     var thongBao = MutableStateFlow("")
         private set

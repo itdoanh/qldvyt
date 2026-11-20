@@ -19,6 +19,7 @@ class KhoRepository @Inject constructor(private val db: QldvytDatabase) {
 
     fun tatCa(): Flow<List<VatTu>> = db.vatTuDao().tatCa()
     fun sapHet(): Flow<List<VatTu>> = db.vatTuDao().sapHet()
+    fun lichSuNhap(): Flow<List<NhapKho>> = db.nhapKhoDao().moiNhat()
 
     suspend fun themVatTu(ten: String, maVt: String, donVi: String, tonToiThieu: Double): String {
         require(ten.isNotBlank()) { "Nhập tên vật tư" }

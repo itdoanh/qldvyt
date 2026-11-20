@@ -119,6 +119,14 @@ class BaoCaoViewModel @Inject constructor(
         res
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    /** Doanh thu tháng trước (để so sánh, vượt MISA chỉ xem 1 tháng). */
+    val doanhThuThangTruoc = thangNam.flatMapLatest { (t, n) ->
+        val tt = if (t == 1) 12 else t - 1
+        val nn = if (t == 1) n - 1 else n
+        val (tu, den) = dauCuoiThang(tt, nn)
+        donDao.doanhThu(tu, den)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
+
     fun xuatCsvDon(uri: Uri) = viewModelScope.launch {
         runCatching {
             val ds = dsDonThang.value

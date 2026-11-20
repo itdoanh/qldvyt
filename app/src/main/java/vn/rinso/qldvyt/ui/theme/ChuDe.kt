@@ -64,6 +64,18 @@ object MauChucNang {
     val LoiNhuan = Color(0xFF2E7D32)
 }
 
+/** Màu nhóm sổ doanh thu (đồng bộ Đơn/DV/Báo cáo). */
+object MauNhomSo {
+    fun cua(nhom: String): Color = when (nhom) {
+        "TIEM_TRUYEN" -> Color(0xFF00796B)
+        "DI_XE_TRONG" -> Color(0xFF1565C0)
+        "THU_TUC" -> Color(0xFF6A1B9A)
+        "CHAM_SOC" -> Color(0xFFE91E63)
+        "VAT_LY" -> Color(0xFFEF6C00)
+        else -> Color(0xFF607D8B)
+    }
+}
+
 /** Theme QLDVYT: hỗ trợ sáng/tối, font hệ thống, tiếng Việt. */
 @Composable
 fun ChuDeQldvyt(

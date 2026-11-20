@@ -14,17 +14,19 @@ import vn.rinso.qldvyt.data.local.GoiDichVu
 import vn.rinso.qldvyt.data.local.GoiDichVuDao
 import java.util.UUID
 
-/** ViewModel dịch vụ & gói: catalog giá + thêm mới. */
+/** ViewModel dịch vụ & gói v3: catalog giá + đã bán (doanh thu từ chi tiết đơn). */
 @HiltViewModel
 class DichVuViewModel @Inject constructor(
     dichVuDao: DichVuDao,
     goiDao: GoiDichVuDao,
+    chiTietDao: vn.rinso.qldvyt.data.local.DonHangChiTietDao,
 ) : ViewModel() {
     private val dvDao = dichVuDao
     private val gDao = goiDao
 
     val dsDichVu = dvDao.tatCa().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val dsGoi = gDao.dangBan().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val dsChiTiet = chiTietDao.tatCa().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val thongBao = MutableStateFlow("")
 
     fun themDichVu(ten: String, gia: Long, donVi: String, nhom: String = "KHAC") = viewModelScope.launch {

@@ -34,14 +34,16 @@ import vn.rinso.qldvyt.core.dinhDangTien
 import vn.rinso.qldvyt.ui.baoCao.tenNhomSo
 import vn.rinso.qldvyt.ui.common.OTimKiem
 import vn.rinso.qldvyt.ui.common.OTrong
+import vn.rinso.qldvyt.ui.theme.MauNhomSo
 
 val DS_NHOM = listOf("TIEM_TRUYEN", "DI_XE_TRONG", "THU_TUC", "CHAM_SOC", "VAT_LY", "KHAC")
 
-/** Màn Dịch vụ & Gói kiểu MISA: lọc nhóm sổ + tìm + thêm. */
+/** Man Dich vu & Goi v3: loc nhom + da ban (so don + doanh thu) + them. */
 @Composable
 fun ManHinhDichVu(vm: DichVuViewModel = hiltViewModel()) {
     val dsDv by vm.dsDichVu.collectAsState()
     val dsGoi by vm.dsGoi.collectAsState()
+    val dsCt by vm.dsChiTiet.collectAsState()
     val tb by vm.thongBao.collectAsState()
     var tab by remember { mutableStateOf(0) }
     var tk by remember { mutableStateOf("") }
@@ -49,31 +51,36 @@ fun ManHinhDichVu(vm: DichVuViewModel = hiltViewModel()) {
     var hienForm by remember { mutableStateOf(false) }
     var oTen by remember { mutableStateOf("") }
     var oGia by remember { mutableStateOf("") }
-    var oDv by remember { mutableStateOf("lần") }
+    var oDv by remember { mutableStateOf("lan") }
+
+    // Thong ke da ban tu chi tiet don (snapshot)
+    val banTheoDv = dsCt.filter { it.dichVuId != null }.groupBy { it.dichVuId }
+    val banTheoGoi = dsCt.filter { it.goiId != null }.groupBy { it.goiId }
 
     val dsDvLoc = dsDv.filter {
         (nhomLoc == null || it.nhom == nhomLoc) &&
             (tk.isBlank() || it.ten.contains(tk.trim(), true) || it.maDv.contains(tk.trim(), true))
-    }
+    }.sortedByDescending { (banTheoDv[it.id]?.sumOf { ct -> ct.thanhTien } ?: 0L) }
     val dsGoiLoc = dsGoi.filter { tk.isBlank() || it.ten.contains(tk.trim(), true) || it.maGoi.contains(tk.trim(), true) }
 
     Scaffold(floatingActionButton = {
-        FloatingActionButton(onClick = { hienForm = !hienForm }) { Icon(Icons.Filled.Add, contentDescription = "Thêm") }
+        FloatingActionButton(onClick = { hienForm = !hienForm }) { Icon(Icons.Filled.Add, contentDescription = "Them") }
     }) { dem ->
         Column(Modifier.fillMaxSize().padding(dem).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(
-                if (tab == 0) "Dịch vụ (${dsDv.size})" else "Gói dịch vụ (${dsGoi.size})",
+                if (tab == 0) "Dich vu (${dsDv.size})" else "Goi dich vu (${dsGoi.size})",
                 style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold,
             )
+            Text("Xep theo doanh thu da ban - gia catalog chi la goi y, ban se snapshot vao don.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
             if (tb.isNotEmpty()) Card { Text(tb, Modifier.padding(12.dp)) }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                AssistChip(onClick = { tab = 0 }, label = { Text((if (tab == 0) "✓ " else "") + "Dịch vụ") })
-                AssistChip(onClick = { tab = 1 }, label = { Text((if (tab == 1) "✓ " else "") + "Gói") })
+                AssistChip(onClick = { tab = 0 }, label = { Text((if (tab == 0) "✓ " else "") + "Dich vu") })
+                AssistChip(onClick = { tab = 1 }, label = { Text((if (tab == 1) "✓ " else "") + "Goi") })
             }
-            OTimKiem(tk, { tk = it }, "Tìm theo tên / mã...")
+            OTimKiem(tk, { tk = it }, "Tim theo ten / ma...")
             if (tab == 0) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    AssistChip(onClick = { nhomLoc = null }, label = { Text((if (nhomLoc == null) "✓ " else "") + "Tất cả") })
+                    AssistChip(onClick = { nhomLoc = null }, label = { Text((if (nhomLoc == null) "✓ " else "") + "Tat ca") })
                     DS_NHOM.take(3).forEach { n ->
                         AssistChip(onClick = { nhomLoc = n }, label = { Text((if (nhomLoc == n) "✓ " else "") + tenNhomSo(n).substringBefore(" ")) })
                     }
@@ -87,43 +94,53 @@ fun ManHinhDichVu(vm: DichVuViewModel = hiltViewModel()) {
             if (hienForm) {
                 Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
                     Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(if (tab == 0) "Thêm dịch vụ" else "Thêm gói", fontWeight = FontWeight.Bold)
-                        OutlinedTextField(oTen, { oTen = it }, label = { Text(if (tab == 0) "Tên dịch vụ (*)" else "Tên gói (*)") }, modifier = Modifier.fillMaxWidth())
-                        OutlinedTextField(oGia, { oGia = it.filter(Char::isDigit) }, label = { Text("Giá (VNĐ)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-                        if (tab == 0) OutlinedTextField(oDv, { oDv = it }, label = { Text("Đơn vị (lần/ca/buổi...)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                        Text(if (tab == 0) "Them dich vu" else "Them goi", fontWeight = FontWeight.Bold)
+                        OutlinedTextField(oTen, { oTen = it }, label = { Text(if (tab == 0) "Ten dich vu (*)" else "Ten goi (*)") }, modifier = Modifier.fillMaxWidth())
+                        OutlinedTextField(oGia, { oGia = it.filter(Char::isDigit) }, label = { Text("Gia (VND)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                        if (tab == 0) OutlinedTextField(oDv, { oDv = it }, label = { Text("Don vi (lan/ca/buoi...)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
                         Button(onClick = {
                             val gia = oGia.toLongOrNull() ?: 0L
-                            if (tab == 0) vm.themDichVu(oTen, gia, oDv.ifBlank { "lần" }, nhomLoc ?: "KHAC")
+                            if (tab == 0) vm.themDichVu(oTen, gia, oDv.ifBlank { "lan" }, nhomLoc ?: "KHAC")
                             else vm.themGoi(oTen, gia)
                             oTen = ""; oGia = ""; hienForm = false
-                        }, modifier = Modifier.fillMaxWidth()) { Text("Lưu") }
-                        Text("Giá catalog chỉ là gợi ý — khi bán sẽ snapshot vào đơn, đổi giá không ảnh hưởng đơn cũ.", style = MaterialTheme.typography.bodySmall)
+                        }, modifier = Modifier.fillMaxWidth()) { Text("Luu") }
+                        Text("Gia catalog chi la goi y - khi ban se snapshot vao don, doi gia khong anh huong don cu.", style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }
             if (tab == 0) {
-                if (dsDvLoc.isEmpty()) OTrong("Không có dịch vụ", "Đổi từ khóa hoặc thêm mới.")
+                if (dsDvLoc.isEmpty()) OTrong("Khong co dich vu", "Doi tu khoa hoac them moi.")
                 else LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(dsDvLoc, key = { it.id }) { dv ->
+                        val cts = banTheoDv[dv.id] ?: emptyList()
+                        val dt = cts.sumOf { it.thanhTien }
+                        val sl = cts.size
                         Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest)) {
                             Column(Modifier.padding(12.dp).fillMaxWidth()) {
-                                Text(dv.ten, fontWeight = FontWeight.Bold)
-                                Text("${dv.maDv} • ${tenNhomSo(dv.nhom)}", style = MaterialTheme.typography.bodySmall)
-                                Text("${dinhDangTien(dv.giaNiemYet)} / ${dv.donVi}", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Text(dv.ten, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                                    Text(dinhDangTien(dv.giaNiemYet), color = MauNhomSo.cua(dv.nhom), fontWeight = FontWeight.Bold)
+                                }
+                                Text("${dv.maDv} - ${tenNhomSo(dv.nhom)} - /${dv.donVi}", style = MaterialTheme.typography.bodySmall)
+                                Text("Da ban: $sl lan - Doanh thu: ${dinhDangTien(dt)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
                                 if (dv.moTa.isNotEmpty()) Text(dv.moTa, style = MaterialTheme.typography.bodySmall)
                             }
                         }
                     }
                 }
             } else {
-                if (dsGoiLoc.isEmpty()) OTrong("Chưa có gói", "Bấm + để thêm gói mới.")
+                if (dsGoiLoc.isEmpty()) OTrong("Chua co goi", "Bam + de them goi moi.")
                 else LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(dsGoiLoc, key = { it.id }) { goi ->
+                        val cts = banTheoGoi[goi.id] ?: emptyList()
+                        val dt = cts.sumOf { it.thanhTien }
                         Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest)) {
                             Column(Modifier.padding(12.dp).fillMaxWidth()) {
-                                Text(goi.ten + " (GÓI)", fontWeight = FontWeight.Bold)
-                                Text(goi.maGoi, style = MaterialTheme.typography.bodySmall)
-                                Text(dinhDangTien(goi.giaGoi), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Text(goi.ten + " (GOI)", fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                                    Text(dinhDangTien(goi.giaGoi), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                                }
+                                Text("${goi.maGoi} - Da ban: ${cts.size} lan - DT: ${dinhDangTien(dt)}", style = MaterialTheme.typography.bodySmall)
                                 if (goi.moTa.isNotEmpty()) Text(goi.moTa, style = MaterialTheme.typography.bodySmall)
                             }
                         }

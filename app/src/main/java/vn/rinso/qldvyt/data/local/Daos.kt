@@ -111,6 +111,9 @@ interface DonHangDao {
 
 @Dao
 interface DonHangChiTietDao {
+    @Query("SELECT * FROM don_hang_chi_tiet")
+    fun tatCa(): Flow<List<DonHangChiTiet>>
+
     @Query("SELECT * FROM don_hang_chi_tiet WHERE donHangId = :donId")
     suspend fun theoDon(donId: String): List<DonHangChiTiet>
 
@@ -180,6 +183,12 @@ interface VatTuDao {
 
 @Dao
 interface NhapKhoDao {
+    @Query("SELECT * FROM nhap_kho ORDER BY ngay DESC LIMIT 100")
+    fun moiNhat(): Flow<List<NhapKho>>
+
+    @Query("SELECT * FROM nhap_kho WHERE vatTuId = :vatTuId ORDER BY ngay DESC LIMIT 20")
+    fun theoVatTu(vatTuId: String): Flow<List<NhapKho>>
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun them(nk: NhapKho)
 }
@@ -188,6 +197,9 @@ interface NhapKhoDao {
 interface KhachHangDao {
     @Query("SELECT * FROM khach_hang ORDER BY hoTen")
     fun tatCa(): Flow<List<KhachHang>>
+
+    @Query("SELECT * FROM khach_hang WHERE id = :id")
+    suspend fun theoId(id: String): KhachHang?
 
     @Query("SELECT * FROM khach_hang WHERE sdt LIKE '%' || :tuKhoa || '%' OR hoTen LIKE '%' || :tuKhoa || '%' ORDER BY hoTen")
     fun timKiem(tuKhoa: String): Flow<List<KhachHang>>

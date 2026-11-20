@@ -10,10 +10,11 @@ import kotlinx.coroutines.flow.stateIn
 import vn.rinso.qldvyt.data.local.DonHangDao
 import vn.rinso.qldvyt.data.prefs.CaiDat
 
-/** ViewModel công nợ: đơn còn nợ + cảnh báo quá hạn theo cài đặt. */
+/** ViewModel công nợ v3: đơn còn nợ + group theo KH + cảnh báo quá hạn. */
 @HiltViewModel
 class CongNoViewModel @Inject constructor(
     donDao: DonHangDao,
+    khachHangDao: vn.rinso.qldvyt.data.local.KhachHangDao,
     caiDat: CaiDat,
 ) : ViewModel() {
     val tongNo = donDao.tongCongNo()
@@ -22,6 +23,9 @@ class CongNoViewModel @Inject constructor(
     val dsNo = combine(donDao.moiNhat(), caiDat.soNgayCanhBaoNo) { ds, _ ->
         ds.filter { it.conNo > 0 && it.trangThai != "HUY" }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val dsKhach = khachHangDao.tatCa()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val soNgayCanhBao = caiDat.soNgayCanhBaoNo
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 7)
