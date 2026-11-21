@@ -129,7 +129,10 @@ fun ManHinhKho(vm: KhoViewModel = hiltViewModel()) {
                     items(dsLoc, key = { it.id }) { vt ->
                         val het = vt.tonKho < vt.tonToiThieu
                         Card(
-                            onClick = { vtChon = vt.id; hienNhap = true },
+                            onClick = {
+                                // Chạm thẻ chỉ chọn highlight để xem, KHÔNG tự mở form nhập kho
+                                vtChon = vt.id
+                            },
                             colors = if (het) CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
                             else CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest),
                         ) {

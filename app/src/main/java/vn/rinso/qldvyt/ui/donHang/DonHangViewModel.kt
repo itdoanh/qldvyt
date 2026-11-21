@@ -47,7 +47,31 @@ class DonHangViewModel @Inject constructor(
     fun chonKhach(id: String) { khachDaChon.value = id }
     fun themMatHang(m: MatHangMoi) { matHangDaChon.value = matHangDaChon.value + m }
     fun xoaMatHang(index: Int) { matHangDaChon.value = matHangDaChon.value.filterIndexed { i, _ -> i != index } }
-    fun themVatTu(v: VatTuDungMoi) { vatTuDaChon.value = vatTuDaChon.value + v }
+
+    /** Điều chỉnh số lượng mặt hàng đã thêm ở bước 2 (gói/dịch vụ). */
+    fun doiSoLuongMatHang(index: Int, delta: Double) {
+        matHangDaChon.value = matHangDaChon.value.mapIndexed { i, m ->
+            if (i != index) m else m.copy(soLuong = maxOf(1.0, m.soLuong + delta))
+        }
+    }
+
+    fun themVatTu(v: VatTuDungMoi) {
+        // Nếu đã có vật tư này thì cộng dồn số lượng, tránh trùng dòng
+        val cu = vatTuDaChon.value
+        val idx = cu.indexOfFirst { it.vatTuId == v.vatTuId }
+        vatTuDaChon.value = if (idx >= 0) {
+            cu.mapIndexed { i, x -> if (i == idx) x.copy(soLuong = x.soLuong + v.soLuong) else x }
+        } else cu + v
+    }
+
+    fun xoaVatTu(index: Int) { vatTuDaChon.value = vatTuDaChon.value.filterIndexed { i, _ -> i != index } }
+
+    /** Điều chỉnh số lượng vật tư đã gắn ở bước 3. */
+    fun doiSoLuongVatTu(index: Int, delta: Double) {
+        vatTuDaChon.value = vatTuDaChon.value.mapIndexed { i, x ->
+            if (i != index) x else x.copy(soLuong = maxOf(0.5, x.soLuong + delta))
+        }
+    }
 
     fun taoDon(onXong: (String) -> Unit) = viewModelScope.launch {
         runCatching {

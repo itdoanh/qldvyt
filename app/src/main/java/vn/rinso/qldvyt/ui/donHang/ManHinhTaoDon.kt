@@ -57,6 +57,7 @@ fun ManHinhTaoDon(
     var oGiam by remember { mutableStateOf("") }
     var tkKh by remember { mutableStateOf("") }
     var tkDv by remember { mutableStateOf("") }
+    var tkVt by remember { mutableStateOf("") }
     var laVangLai by remember { mutableStateOf(false) }
     var tenVangLai by remember { mutableStateOf("") }
     var sdtVangLai by remember { mutableStateOf("") }
@@ -77,8 +78,21 @@ fun ManHinhTaoDon(
     } else (truocVat * tyLeVatMm).toLong()
     val thanhToan = truocVat + tienVatMm
     val khLoc = dsKhach.filter { tkKh.isBlank() || it.hoTen.contains(tkKh.trim(), true) || it.sdt.contains(tkKh.trim()) }
-    val dvLoc = dsDv.filter { tkDv.isBlank() || it.ten.contains(tkDv.trim(), true) }
-    val goiLoc = dsGoi.filter { tkDv.isBlank() || it.ten.contains(tkDv.trim(), true) }
+    fun khongDau(s: String): String = try {
+        java.text.Normalizer.normalize(s, java.text.Normalizer.Form.NFD)
+            .replace("\\p{M}".toRegex(), "").lowercase().replace('đ', 'd').replace('Đ', 'd')
+    } catch (_: Exception) { s.lowercase() }
+    fun khopTuongDoi(ten: String, ma: String, tuKhoa: String): Boolean {
+        val tk = tuKhoa.trim(); if (tk.isBlank()) return true
+        val tenKD = khongDau(ten); val maKD = khongDau(ma); val tkKD = khongDau(tk)
+        // Từng từ trong từ khóa đều phải xuất hiện (search tương đối cho kho lớn)
+        return tkKD.split("\\s+".toRegex()).all { tu -> tenKD.contains(tu) || maKD.contains(tu) } ||
+            ten.contains(tk.trim(), true) || ma.contains(tk.trim(), true)
+    }
+    val dvLoc = dsDv.filter { khopTuongDoi(it.ten, it.maDv, tkDv) }
+    val goiLoc = dsGoi.filter { khopTuongDoi(it.ten, it.maGoi, tkDv) }
+    val mapVt = dsVt.associateBy { it.id }
+    val vtLoc = dsVt.filter { khopTuongDoi(it.ten, it.maVt, tkVt) }
 
     Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text("Tạo đơn mới", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
@@ -128,6 +142,27 @@ fun ManHinhTaoDon(
             }
         } else if (buoc == 2) {
             OTimKiem(tkDv, { tkDv = it }, "Tìm dịch vụ / gói...")
+            // B2: danh sách đã thêm — tên gói/DV + số lượng + đơn giá + điều chỉnh/Xóa
+            if (mhChon.isNotEmpty()) {
+                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
+                    Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("Gói / dịch vụ đã thêm (${mhChon.size}):", fontWeight = FontWeight.Bold)
+                        mhChon.forEachIndexed { i, m ->
+                            val laGoi = m.goiId != null
+                            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Text((if (laGoi) "📦 " else "💉 ") + m.tenHienThi, fontWeight = FontWeight.SemiBold)
+                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    OutlinedButton(onClick = { vm.doiSoLuongMatHang(i, -1.0) }) { Text("−") }
+                                    AssistChip(onClick = {}, label = { Text("× ${m.soLuong.toInt()}") })
+                                    OutlinedButton(onClick = { vm.doiSoLuongMatHang(i, 1.0) }) { Text("+") }
+                                    OutlinedButton(onClick = { vm.xoaMatHang(i) }) { Text("Xóa") }
+                                }
+                                Text("${dinhDangTien(m.donGia)} × ${m.soLuong.toInt()} = ${dinhDangTien((m.soLuong * m.donGia).toLong())}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                            }
+                        }
+                    }
+                }
+            }
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.weight(1f)) {
                 items(dvLoc, key = { it.id }) { dv ->
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -166,10 +201,42 @@ fun ManHinhTaoDon(
                 }
                 OutlinedTextField(oGiam, { oGiam = it.filter(Char::isDigit) }, label = { Text("Giảm giá (VNĐ)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
                 Text("Vật tư dùng cho đơn (trừ tồn kho):", fontWeight = FontWeight.Bold)
-                dsVt.take(15).forEach { vt ->
-                    AssistChip(onClick = { vm.themVatTu(VatTuDungMoi(vt.id, 1.0)) }, label = { Text("+ ${vt.ten} (${vt.tonKho.toInt()})") })
+                OTimKiem(tkVt, { tkVt = it }, "Tìm vật tư theo tên / mã (gõ không dấu vẫn ra)...")
+                // B3: vật tư đã gắn — tên + SL + đơn giá vốn + thành tiền + tăng/giảm/Xóa
+                if (vtChon.isNotEmpty()) {
+                    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
+                        Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("Vật tư đã thêm (${vtChon.size}):", fontWeight = FontWeight.Bold)
+                            vtChon.forEachIndexed { i, x ->
+                                val vt = mapVt[x.vatTuId]
+                                val tenVt = vt?.ten ?: "Vật tư"
+                                val von = vt?.giaNhapTB ?: 0L
+                                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                    Text("🧰 $tenVt", fontWeight = FontWeight.SemiBold)
+                                    Text("SL ${x.soLuong.toInt()} ${vt?.donVi ?: ""} × ${dinhDangTien(von)} = ${dinhDangTien((x.soLuong * von).toLong())}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        OutlinedButton(onClick = { vm.doiSoLuongVatTu(i, -1.0) }) { Text("−") }
+                                        OutlinedButton(onClick = { vm.doiSoLuongVatTu(i, 1.0) }) { Text("+") }
+                                        OutlinedButton(onClick = { vm.xoaVatTu(i) }) { Text("Xóa") }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    Text("Chưa gắn vật tư nào (không bắt buộc).", style = MaterialTheme.typography.bodySmall)
                 }
-                if (vtChon.isNotEmpty()) Text("Đã gắn ${vtChon.size} dòng vật tư.", color = MaterialTheme.colorScheme.primary)
+                Text("Chọn thêm từ kho (${vtLoc.size} khớp):", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                vtLoc.take(30).forEach { vt ->
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Column(Modifier.weight(1f)) {
+                            Text(vt.ten, fontWeight = FontWeight.SemiBold)
+                            Text("${vt.maVt} • Tồn ${vt.tonKho.toInt()} ${vt.donVi} • Vốn ${dinhDangTien(vt.giaNhapTB)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                        }
+                        OutlinedButton(onClick = { vm.themVatTu(VatTuDungMoi(vt.id, 1.0)) }) { Text("+ Thêm") }
+                    }
+                }
+                if (vtLoc.size > 30) Text("... còn ${vtLoc.size - 30} vật tư nữa — thu hẹp từ khóa để tìm.", style = MaterialTheme.typography.bodySmall)
                 Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
                     Column(Modifier.padding(12.dp)) {
                         Text("Tổng hàng: ${dinhDangTien(tongHang)}")

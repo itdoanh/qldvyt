@@ -143,47 +143,269 @@ class PdfExporter @Inject constructor(@ApplicationContext private val ctx: Conte
         ghi(doc, uri)
     }
 
-    /** Phiếu lương chi tiết 1 nhân viên (có thuế TNCN + phụ cấp theo cài đặt). */
+    // ============ PHIẾU LƯƠNG KIỂU DOANH NGHIỆP VN ============
+    /** Phiếu lương chi tiết 1 nhân viên — bố cục chuẩn công ty lớn tại VN. */
     fun xuatPhieuLuong(uri: Uri, bl: BangLuong, nv: NhanVien, capTen: String, cty: ThongTinCongTy) {
         val doc = PdfDocument()
+        val w = 595; val h = 842
+        var soTrang = 1
+        var page = doc.startPage(PdfDocument.PageInfo.Builder(w, h, soTrang).create())
+        val c = page.canvas
+        val den = 0xFF111111.toInt(); val xam = 0xFF444444.toInt()
+        val xanh = 0xFF0D47A1.toInt(); val xanhNhat = 0xFFE3F2FD.toInt()
+        val pTenCty = paint(xanh, 13f, true)
+        val pCtyNho = paint(xam, 10f)
+        val pTieuDe = paint(xanh, 19f, true)
+        val pPhuDe = paint(xam, 11f)
+        val pTb = paint(den, 11f); val pTbDam = paint(den, 11f, true)
+        val pNho = paint(xam, 10f)
+        val pTien = paint(den, 11f); val pTienDam = paint(den, 12f, true)
+        val pThucLinh = paint(0xFFB71C1C.toInt(), 16f, true)
+        val vien = Paint().apply { style = Paint.Style.STROKE; strokeWidth = 1.2f; color = 0xFF90A4AE.toInt() }
+        val vienDam = Paint().apply { style = Paint.Style.STROKE; strokeWidth = 1.8f; color = xanh }
+        val nenTieuDe = Paint().apply { style = Paint.Style.FILL; color = xanhNhat }
+        val nenThucLinh = Paint().apply { style = Paint.Style.FILL; color = 0xFFFFF3E0.toInt() }
+
+        var y = 48f
+        val le = 40f; val phai = (w - 40).toFloat()
+        // --- Đầu trang công ty ---
+        c.drawText(cty.ten.uppercase(VI), le, y, pTenCty); y += 15f
+        c.drawText("Đ/c: ${cty.diaChi}  •  ĐT: ${cty.sdt}" + if (cty.maSoThue.isNotBlank()) "  •  MST: ${cty.maSoThue}" else "", le, y, pCtyNho); y += 6f
+        c.drawLine(le, y, phai, y, Paint().apply { strokeWidth = 2.5f; color = xanh }); y += 18f
+        // --- Tiêu đề phiếu ---
+        c.drawText("PHIẾU THANH TOÁN TIỀN LƯƠNG", le, y, pTieuDe); y += 18f
+        c.drawText("Tháng ${bl.thang}/${bl.nam}  •  Trạng thái: ${if (bl.trangThai == "CHOT") "ĐÃ CHỐT" else "BẢN NHÁP"}  •  Ngày in: ${SimpleDateFormat("dd/MM/yyyy", VI).format(Date())}", le, y, pPhuDe); y += 16f
+
+        // --- Khung thông tin nhân viên (2 cột) ---
+        val caoNV = 86f
+        c.drawRect(le, y, phai, y + caoNV, vienDam)
+        c.drawLine((le + phai) / 2, y, (le + phai) / 2, y + caoNV, vien)
+        c.drawLine(le, y + caoNV / 2.75f, phai, y + caoNV / 2.75f, vien)
+        c.drawLine(le, y + caoNV * 2 / 2.75f, phai, y + caoNV * 2 / 2.75f, vien)
+        var ynv = y + 15f
+        val giua = (le + phai) / 2 + 8f
+        c.drawText("Mã NV: ${nv.maNv}", le + 8f, ynv, pTbDam)
+        c.drawText("Họ và tên: ${nv.hoTen}", giua, ynv, pTbDam); ynv += 20f
+        c.drawText("Chức vụ: ${capTen.ifBlank { "—" }}", le + 8f, ynv, pTb)
+        c.drawText("SĐT: ${nv.sdt.ifBlank { "—" }}", giua, ynv, pTb); ynv += 20f
+        c.drawText("STK: ${nv.stk.ifBlank { "—" }}", le + 8f, ynv, pTb)
+        c.drawText("Tổng công: ${bl.tongCong} công", giua, ynv, pTb); ynv += 20f
+        c.drawText("Ngày vào làm: ${dinhDangNgay(nv.ngayVaoLam)}", le + 8f, ynv, pNho)
+        y += caoNV + 14f
+
+        // --- Bảng thu nhập / khấu trừ (2 khối) ---
         val thuNhap = bl.luongCoBan + bl.tienNhiemVu + bl.hoaHong + bl.thuong + bl.chuyenCan + bl.phuCap
-        val dong = mutableListOf(
-            "PHIẾU LƯƠNG THÁNG ${bl.thang}/${bl.nam}",
-            "Nhân viên: ${nv.hoTen} — Mã: ${nv.maNv} — Cấp bậc: $capTen",
-            "SĐT: ${nv.sdt.ifBlank { "—" }} — Ngày vào làm: ${dinhDangNgay(nv.ngayVaoLam)}",
-            "------------------------------------------------------",
-            "Lương theo công (${bl.tongCong} công): ${dinhDangTien(bl.luongCoBan)}",
-            "Tiền nhiệm vụ 30%: ${dinhDangTien(bl.tienNhiemVu)}",
-            "Hoa hồng: ${dinhDangTien(bl.hoaHong)}",
-            "Thưởng: ${dinhDangTien(bl.thuong)}",
-            "Chuyên cần: ${dinhDangTien(bl.chuyenCan)}",
-            "Phụ cấp: ${dinhDangTien(bl.phuCap)}",
-            "Tổng thu nhập: ${dinhDangTien(thuNhap)}",
-            "Thuế TNCN khấu trừ: ${dinhDangTien(bl.thueTncn)}",
-            "Tạm ứng: ${dinhDangTien(bl.tamUng)}",
-            "Khấu trừ khác (phạt...): ${dinhDangTien(bl.khauTruKhac)}",
-            "------------------------------------------------------",
-            "THỰC LĨNH: ${dinhDangTien(bl.thucLinh)}",
-            "Trạng thái: ${if (bl.trangThai == "CHOT") "ĐÃ CHỐT" else "Bản nháp"}",
+        val khauTru = bl.tamUng + bl.khauTruKhac + bl.thueTncn
+        val hangTN = listOf(
+            "Lương theo công (${bl.tongCong} công)" to bl.luongCoBan,
+            "Tiền nhiệm vụ (30%)" to bl.tienNhiemVu,
+            "Hoa hồng" to bl.hoaHong,
+            "Thưởng" to bl.thuong,
+            "Chuyên cần" to bl.chuyenCan,
+            "Phụ cấp" to bl.phuCap,
         )
-        veTrang(doc, "RINSO — PHIẾU LƯƠNG", cty, dong, setOf(0, dong.size - 2),
-            listOf("Kế toán: ....................   Nhân viên: ...................."))
+        val hangKT = listOf(
+            "Tạm ứng" to bl.tamUng,
+            "Phạt / khấu trừ khác" to bl.khauTruKhac,
+            "Thuế TNCN" to bl.thueTncn,
+        )
+        fun veKhoi(tieuDe: String, hang: List<Pair<String, Long>>, tong: Long, tongNhan: String): Float {
+            val caoHang = 21f; val caoHead = 24f
+            val cao = caoHead + hang.size * caoHang + caoHang
+            // nền + viền
+            c.drawRect(le, y, phai, y + cao, vien)
+            c.drawRect(le, y, phai, y + caoHead, nenTieuDe)
+            c.drawLine(le, y + caoHead, phai, y + caoHead, vien)
+            c.drawLine(le + 330f, y, le + 330f, y + cao, vien)
+            c.drawText(tieuDe, le + 10f, y + 16f, pTbDam)
+            c.drawText("Số tiền (VNĐ)", le + 340f, y + 16f, pTbDam)
+            var yy = y + caoHead + 15f
+            hang.forEach { (ten, tien) ->
+                c.drawText(ten, le + 10f, yy, pTb)
+                c.drawText(dinhDangTien(tien), le + 340f, yy, pTien)
+                c.drawLine(le, yy + 6f, phai, yy + 6f, Paint().apply { strokeWidth = 0.6f; color = 0xFFCFD8DC.toInt() })
+                yy += caoHang
+            }
+            c.drawRect(le, yy - 15f, phai, yy + 6f, Paint().apply { style = Paint.Style.FILL; color = 0xFFF5F5F5.toInt() })
+            c.drawText(tongNhan, le + 10f, yy, pTbDam)
+            c.drawText(dinhDangTien(tong), le + 340f, yy, pTienDam)
+            return cao + 12f
+        }
+        y += veKhoi("A. CÁC KHOẢN THU NHẬP", hangTN, thuNhap, "Tổng thu nhập")
+        y += veKhoi("B. CÁC KHOẢN KHẤU TRỪ", hangKT, khauTru, "Tổng khấu trừ")
+
+        // --- Thực lĩnh nổi bật ---
+        val caoTL = 44f
+        c.drawRect(le, y, phai, y + caoTL, vienDam)
+        c.drawRect(le, y, phai, y + caoTL, nenThucLinh)
+        c.drawText("C. THỰC LĨNH:", le + 10f, y + 27f, paint(den, 13f, true))
+        val sTL = dinhDangTien(bl.thucLinh)
+        c.drawText(sTL, phai - pThucLinh.measureText(sTL) - 10f, y + 28f, pThucLinh)
+        y += caoTL + 8f
+        c.drawText("Bằng chữ: ${docTienBangChu(bl.thucLinh)}.", le, y, pNho); y += 18f
+
+        // --- Ký tên 3 bên ---
+        c.drawText("Xác nhận của các bên (ký, ghi rõ họ tên):", le, y, pTbDam); y += 18f
+        val c1 = le + 90f; val c2 = (le + phai) / 2; val c3 = phai - 90f
+        c.drawText("Người lập phiếu", c1 - 45f, y, pTb)
+        c.drawText("Kế toán", c2 - 25f, y, pTb)
+        c.drawText("Nhân viên", c3 - 30f, y, pTb); y += 52f
+        c.drawText("(Ký, họ tên)", c1 - 35f, y, pNho)
+        c.drawText("(Ký, họ tên)", c2 - 35f, y, pNho)
+        c.drawText("(Ký, họ tên)", c3 - 35f, y, pNho)
+        val stamp = SimpleDateFormat("dd/MM/yyyy HH:mm", VI).format(Date())
+        c.drawText("In lúc $stamp — Rinso QLDVYT (offline) — Trang $soTrang", le, (h - 36).toFloat(), pCtyNho)
+        doc.finishPage(page)
         ghi(doc, uri)
     }
 
-    /** Bảng lương tổng hợp cả công ty trong tháng. */
+    // ============ BẢNG TỔNG HỢP LƯƠNG THÁNG (CHI TIẾT FULL) ============
+    /** Bảng lương tổng hợp cả công ty — bảng kẻ chi tiết từng NV + tổng từng cột + ngày in. */
     fun xuatBangLuongThang(uri: Uri, thang: Int, nam: Int, cacDong: List<Triple<NhanVien, BangLuong, String>>, cty: ThongTinCongTy) {
         val doc = PdfDocument()
-        val dong = mutableListOf("BẢNG LƯƠNG TỔNG HỢP THÁNG $thang/$nam (${cacDong.size} NV)")
-        var tong = 0L
-        cacDong.forEachIndexed { i, (nv, bl, _) ->
-            dong += "${i + 1}. ${nv.hoTen} (${nv.maNv}) — Công ${bl.tongCong} — NV30 ${dinhDangTien(bl.tienNhiemVu)} — Thực lĩnh ${dinhDangTien(bl.thucLinh)}${if (bl.thueTncn > 0) " (TNCN ${dinhDangTien(bl.thueTncn)})" else ""}"
-            tong += bl.thucLinh
+        val w = 595; val h = 842
+        val den = 0xFF111111.toInt(); val xam = 0xFF444444.toInt(); val xanh = 0xFF0D47A1.toInt()
+        val pTenCty = paint(xanh, 12f, true)
+        val pNho = paint(xam, 9.5f)
+        val pTieuDe = paint(xanh, 16f, true)
+        val pHead = paint(0xFFFFFFFF.toInt(), 8.5f, true)
+        val pO = paint(den, 8.5f)
+        val pODam = paint(den, 9f, true)
+        val pTong = paint(0xFFB71C1C.toInt(), 10f, true)
+        val vien = Paint().apply { style = Paint.Style.STROKE; strokeWidth = 0.9f; color = 0xFF78909C.toInt() }
+        val nenHead = Paint().apply { style = Paint.Style.FILL; color = xanh }
+        val nenTong = Paint().apply { style = Paint.Style.FILL; color = 0xFFFFF3E0.toInt() }
+
+        val le = 24f; val phai = (w - 20).toFloat()
+        val rong = phai - le
+        // STT24 Ten85 Cong30 LCB50 NV50 Thuong50 CCPC50 TamUng50 Phat38 TNCN38 ThucLinh50 = 514
+        val cot = floatArrayOf(24f, 105f, 30f, 48f, 48f, 48f, 48f, 48f, 36f, 36f, 64f)
+        val tyLe = rong / cot.sum()
+        val wCot = cot.map { it * tyLe }.toFloatArray()
+        val tieuDeCot = listOf("STT", "Họ và tên", "Công", "Lương\ncông", "NV\n30%", "Thưởng\n+HH", "CCần\n+PC", "Tạm\nứng", "Phạt", "TNCN", "Thực lĩnh")
+        val caoHead = 30f; val caoDong = 18f
+
+        var soTrang = 0
+        var page = doc.startPage(PdfDocument.PageInfo.Builder(w, h, ++soTrang).create())
+        var c = page.canvas
+        var y = 40f
+        fun headerTrang(dau: Boolean) {
+            if (!dau) { doc.finishPage(page); page = doc.startPage(PdfDocument.PageInfo.Builder(w, h, ++soTrang).create()); c = page.canvas; y = 40f }
+            c.drawText(cty.ten.uppercase(VI), le, y, pTenCty); y += 13f
+            c.drawText("Đ/c: ${cty.diaChi} • ĐT: ${cty.sdt}" + if (cty.maSoThue.isNotBlank()) " • MST: ${cty.maSoThue}" else "", le, y, pNho); y += 13f
+            c.drawText("BẢNG TỔNG HỢP THANH TOÁN LƯƠNG THÁNG $thang/$nam (${cacDong.size} nhân viên)", le, y, pTieuDe); y += 15f
+            c.drawText("Ngày in: ${SimpleDateFormat("dd/MM/yyyy HH:mm", VI).format(Date())}  •  Đơn vị tiền: VNĐ", le, y, pNho); y += 12f
+            // vẽ header bảng
+            var x = le
+            c.drawRect(le, y, phai, y + caoHead, nenHead)
+            tieuDeCot.forEachIndexed { i, t ->
+                val parts = t.split("\n")
+                if (parts.size == 1) c.drawText(t, x + 3f, y + 19f, pHead)
+                else { c.drawText(parts[0], x + 3f, y + 12f, pHead); c.drawText(parts[1], x + 3f, y + 22f, pHead) }
+                x += wCot[i]
+                c.drawLine(x, y, x, y + caoHead, Paint().apply { strokeWidth = 0.9f; color = 0xFFFFFFFF.toInt() })
+            }
+            y += caoHead
         }
-        dong += "------------------------------------------------------"
-        dong += "TỔNG QUỸ LƯƠNG: ${dinhDangTien(tong)}"
-        veTrang(doc, "RINSO — BẢNG LƯƠNG", cty, dong, setOf(0, dong.size - 1), emptyList())
+        headerTrang(true)
+        // Vẽ từng dòng NV
+        var stt = 0
+        var tCong = 0.0; var tLcb = 0L; var tNv = 0L; var tThuong = 0L; var tCcPc = 0L; var tUng = 0L; var tPhat = 0L; var tTncn = 0L; var tTl = 0L
+        cacDong.forEach { (nv, bl, _) ->
+            if (y + caoDong > h - 150) headerTrang(false)
+            stt += 1
+            tCong += bl.tongCong; tLcb += bl.luongCoBan; tNv += bl.tienNhiemVu
+            tThuong += bl.thuong + bl.hoaHong; tCcPc += bl.chuyenCan + bl.phuCap
+            tUng += bl.tamUng; tPhat += bl.khauTruKhac; tTncn += bl.thueTncn; tTl += bl.thucLinh
+            val o = listOf(
+                "$stt", nv.hoTen.take(18), "${bl.tongCong}",
+                rutGon(bl.luongCoBan), rutGon(bl.tienNhiemVu), rutGon(bl.thuong + bl.hoaHong),
+                rutGon(bl.chuyenCan + bl.phuCap), rutGon(bl.tamUng), rutGon(bl.khauTruKhac),
+                rutGon(bl.thueTncn), rutGon(bl.thucLinh),
+            )
+            var x = le
+            o.forEachIndexed { i, s ->
+                val p = if (i == 10) pODam else pO
+                // cột số căn phải, cột tên căn trái
+                if (i >= 2) {
+                    val wT = p.measureText(s)
+                    c.drawText(s, x + wCot[i] - wT - 3f, y + 13f, p)
+                } else c.drawText(s, x + 3f, y + 13f, p)
+                x += wCot[i]
+            }
+            // kẻ khung dòng
+            var xx = le
+            c.drawRect(le, y, phai, y + caoDong, vien)
+            wCot.forEach { wc -> xx += wc; c.drawLine(xx, y, xx, y + caoDong, vien) }
+            y += caoDong
+        }
+        // Dòng tổng cộng
+        if (y + caoDong > h - 140) headerTrang(false)
+        var x = le
+        val oTong = listOf("Σ", "${cacDong.size} NV", "${"%.1f".format(tCong)}", rutGon(tLcb), rutGon(tNv), rutGon(tThuong), rutGon(tCcPc), rutGon(tUng), rutGon(tPhat), rutGon(tTncn), rutGon(tTl))
+        c.drawRect(le, y, phai, y + caoDong + 4f, nenTong)
+        oTong.forEachIndexed { i, s ->
+            val p = pTong
+            if (i >= 2) { val wT = p.measureText(s); c.drawText(s, x + wCot[i] - wT - 3f, y + 14f, p) }
+            else c.drawText(s, x + 3f, y + 14f, p)
+            x += wCot[i]
+        }
+        var xx = le
+        c.drawRect(le, y, phai, y + caoDong + 4f, vien)
+        wCot.forEach { wc -> xx += wc; c.drawLine(xx, y, xx, y + caoDong + 4f, vien) }
+        y += caoDong + 16f
+        // Khối tổng hợp chi tiết
+        if (y > h - 160) headerTrang(false)
+        c.drawText("TỔNG HỢP CHI TIẾT THÁNG $thang/$nam:", le, y, pODam); y += 15f
+        val chiTiet = listOf(
+            "Tổng quỹ lương thực lĩnh: ${dinhDangTien(tTl)}  (${cacDong.size} nhân viên)",
+            "Tổng lương theo công: ${dinhDangTien(tLcb)}  •  Tiền nhiệm vụ 30%: ${dinhDangTien(tNv)}",
+            "Thưởng + hoa hồng: ${dinhDangTien(tThuong)}  •  Chuyên cần + phụ cấp: ${dinhDangTien(tCcPc)}",
+            "Tổng tạm ứng: ${dinhDangTien(tUng)}  •  Phạt/khấu trừ: ${dinhDangTien(tPhat)}  •  Thuế TNCN: ${dinhDangTien(tTncn)}",
+            "Bình quân thực lĩnh: ${dinhDangTien(if (cacDong.isNotEmpty()) tTl / cacDong.size else 0L)}/NV  •  Tổng công: ${"%.1f".format(tCong)}",
+        )
+        chiTiet.forEach { s -> c.drawText("• $s", le, y, pO); y += 14f }
+        y += 10f
+        c.drawText("Người lập bảng          Kế toán trưởng          Giám đốc", le + 30f, y, pO); y += 44f
+        c.drawText("(Ký, họ tên)               (Ký, họ tên)               (Ký, đóng dấu)", le + 30f, y, pNho)
+        val stamp = SimpleDateFormat("dd/MM/yyyy HH:mm", VI).format(Date())
+        c.drawText("In lúc $stamp — Rinso QLDVYT (offline) — Trang $soTrang", le, (h - 30).toFloat(), pNho)
+        doc.finishPage(page)
         ghi(doc, uri)
+    }
+
+    /** Rút gọn số tiền cho vừa cột bảng tổng hợp (tr, k). */
+    private fun rutGon(tien: Long): String = when {
+        tien == 0L -> "0"
+        tien >= 1_000_000L -> {
+            val tr = tien / 1_000_000L; val le = (tien % 1_000_000L) / 100_000L
+            if (le == 0L) "${tr}tr" else "${tr},${le}tr"
+        }
+        tien >= 1_000L -> "${tien / 1_000L}k"
+        else -> tien.toString()
+    }
+
+    /** Đọc số tiền bằng chữ (rút gọn, đủ dùng cho phiếu lương). */
+    private fun docTienBangChu(tien: Long): String {
+        if (tien <= 0L) return "Không đồng"
+        val donVi = arrayOf("", "nghìn", "triệu", "tỷ")
+        fun doc3(n: Int): String {
+            val tram = n / 100; val chuc = (n % 100) / 10; val dv = n % 10
+            val so = arrayOf("không", "một", "hai", "ba", "bốn", "năm", "sáu", "bảy", "tám", "chín")
+            var s = ""
+            if (tram > 0) s += "${so[tram]} trăm "
+            if (chuc > 1) { s += "${so[chuc]} mươi "; s += if (dv == 1) "mốt " else if (dv == 5) "lăm " else if (dv > 0) "${so[dv]} " else "" }
+            else if (chuc == 1) { s += "mười "; s += if (dv == 5) "lăm " else if (dv > 0) "${so[dv]} " else "" }
+            else if (dv > 0) { if (tram > 0) s += "lẻ "; s += "${so[dv]} " }
+            return s
+        }
+        var t = tien; var i = 0; var kq = ""
+        while (t > 0 && i < donVi.size) {
+            val n = (t % 1000).toInt()
+            if (n > 0) kq = "${doc3(n)}${donVi[i]} $kq"
+            t /= 1000; i++
+        }
+        return (kq.trim().replaceFirstChar { it.uppercase() } + " đồng").replace("  ", " ")
     }
 
     private fun tenTrangThai(tt: String) = when (tt) {

@@ -27,7 +27,7 @@ class NhanVienRepository @Inject constructor(private val db: QldvytDatabase) {
         return id
     }
 
-    suspend fun themNhanVien(hoTen: String, sdt: String, capBacId: String, luongOverride: Long? = null): String {
+    suspend fun themNhanVien(hoTen: String, sdt: String, capBacId: String, diaChi: String = "", luongOverride: Long? = null): String {
         require(hoTen.isNotBlank()) { "Nhập họ tên nhân viên" }
         require(capBacId.isNotBlank()) { "Hãy chọn cấp bậc" }
         val id = UUID.randomUUID().toString()
@@ -35,11 +35,37 @@ class NhanVienRepository @Inject constructor(private val db: QldvytDatabase) {
         db.nhanVienDao().them(
             NhanVien(
                 id = id, maNv = maNv, hoTen = hoTen.trim(), sdt = sdt.trim(),
-                capBacId = capBacId, ngayVaoLam = System.currentTimeMillis(),
+                diaChi = diaChi.trim(), capBacId = capBacId, ngayVaoLam = System.currentTimeMillis(),
                 luongCoBanOverride = luongOverride,
             )
         )
         return id
+    }
+
+    /** Sửa thông tin từng nhân viên (tên / SĐT / địa chỉ / cấp bậc / trạng thái / ghi chú). */
+    suspend fun suaNhanVien(
+        nvId: String, hoTen: String, sdt: String, diaChi: String,
+        capBacId: String, trangThai: String, ghiChu: String, stk: String = "",
+    ) {
+        require(hoTen.isNotBlank()) { "Nhập họ tên nhân viên" }
+        val cu = db.nhanVienDao().theoId(nvId) ?: error("Không tìm thấy nhân viên")
+        db.nhanVienDao().sua(
+            cu.copy(
+                hoTen = hoTen.trim(), sdt = sdt.trim(), diaChi = diaChi.trim(),
+                capBacId = capBacId.ifBlank { cu.capBacId }, trangThai = trangThai.ifBlank { cu.trangThai },
+                ghiChu = ghiChu.trim(), stk = stk.trim(),
+            )
+        )
+    }
+
+    suspend fun xoaNhanVien(nvId: String) {
+        // Giữ an toàn: NV đã có chấm công / nhiệm vụ / lương thì không cho xóa
+        try {
+            db.nhanVienDao().theoId(nvId) ?: error("Không tìm thấy nhân viên")
+            // Xóa mềm: chuyển sang NGHIVIEC để giữ lịch sử lương
+            val cu = db.nhanVienDao().theoId(nvId)!!
+            db.nhanVienDao().sua(cu.copy(trangThai = "NGHIVIEC"))
+        } catch (e: Exception) { throw e }
     }
 
     suspend fun chamCong(nhanVienId: String, ngayDauNgay: Long, soCong: Double, diMuon: Boolean) {

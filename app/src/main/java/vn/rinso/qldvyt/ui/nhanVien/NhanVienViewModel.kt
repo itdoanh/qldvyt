@@ -24,11 +24,29 @@ class NhanVienViewModel @Inject constructor(private val repo: NhanVienRepository
         }.onFailure { thongBao.value = it.message ?: "Thêm thất bại" }
     }
 
-    fun themNhanVien(hoTen: String, sdt: String, capBacId: String) = viewModelScope.launch {
+    fun themNhanVien(hoTen: String, sdt: String, capBacId: String, diaChi: String = "") = viewModelScope.launch {
         runCatching {
-            repo.themNhanVien(hoTen, sdt, capBacId)
+            repo.themNhanVien(hoTen, sdt, capBacId, diaChi)
             thongBao.value = "Đã thêm nhân viên $hoTen"
         }.onFailure { thongBao.value = it.message ?: "Thêm thất bại" }
+    }
+
+    /** Sửa thông tin từng nhân viên (tên / SĐT / địa chỉ / cấp bậc / STK / ghi chú / trạng thái). */
+    fun suaNhanVien(
+        nvId: String, hoTen: String, sdt: String, diaChi: String,
+        capBacId: String, stk: String, ghiChu: String, trangThai: String,
+    ) = viewModelScope.launch {
+        runCatching {
+            repo.suaNhanVien(nvId, hoTen, sdt, diaChi, capBacId, trangThai, ghiChu, stk)
+            thongBao.value = "Đã cập nhật thông tin nhân viên"
+        }.onFailure { thongBao.value = it.message ?: "Sửa thất bại" }
+    }
+
+    fun xoaNhanVien(nvId: String) = viewModelScope.launch {
+        runCatching {
+            repo.xoaNhanVien(nvId)
+            thongBao.value = "Đã chuyển nhân viên sang nghỉ việc (giữ lịch sử lương)"
+        }.onFailure { thongBao.value = it.message ?: "Xóa thất bại" }
     }
 
     fun chamNhanh(nvId: String, soCong: Double, diMuon: Boolean) = viewModelScope.launch {

@@ -57,6 +57,14 @@ fun ManHinhNhanVien(vm: NhanVienViewModel = hiltViewModel()) {
     var oLuong by remember { mutableStateOf("") }
     var capChon by remember { mutableStateOf<String?>(null) }
     var nvMoRong by remember { mutableStateOf<String?>(null) }
+    var nvSua by remember { mutableStateOf<String?>(null) }
+    var eTen by remember { mutableStateOf("") }
+    var eSdt by remember { mutableStateOf("") }
+    var eDc by remember { mutableStateOf("") }
+    var eStk by remember { mutableStateOf("") }
+    var eGhiChu by remember { mutableStateOf("") }
+    var eCap by remember { mutableStateOf<String?>(null) }
+    var eTrangThai by remember { mutableStateOf("DANGLAM") }
     var oTienTP by remember { mutableStateOf("") }
     var oLyDoTP by remember { mutableStateOf("") }
     val ctx = LocalContext.current
@@ -113,7 +121,7 @@ fun ManHinhNhanVien(vm: NhanVienViewModel = hiltViewModel()) {
                                 AssistChip(onClick = { capChon = cap.id }, label = { Text((if (capChon == cap.id) "✓ " else "") + cap.ten) })
                             }
                             Button(onClick = {
-                                if (capChon != null) { vm.themNhanVien(oTen, oSdt, capChon!!); oTen = ""; oSdt = ""; oDc = ""; hienForm = false }
+                                if (capChon != null) { vm.themNhanVien(oTen, oSdt, capChon!!, oDc); oTen = ""; oSdt = ""; oDc = ""; hienForm = false }
                             }, enabled = capChon != null, modifier = Modifier.fillMaxWidth()) { Text("Thêm nhân viên") }
                         }
                     }
@@ -139,12 +147,52 @@ fun ManHinhNhanVien(vm: NhanVienViewModel = hiltViewModel()) {
                                             ctx.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:${nv.sdt}")))
                                         }) { Icon(Icons.Filled.Phone, contentDescription = "Gọi NV") }
                                     }
-                                    if (nv.diaChi.isNotEmpty()) Text(nv.diaChi, style = MaterialTheme.typography.bodySmall)
+                                    if (nv.diaChi.isNotEmpty()) Text("Đ/c: ${nv.diaChi}", style = MaterialTheme.typography.bodySmall)
+                                    if (nv.stk.isNotEmpty()) Text("STK: ${nv.stk}", style = MaterialTheme.typography.bodySmall)
                                     if (nv.ghiChu.isNotEmpty()) Text("📝 ${nv.ghiChu}", style = MaterialTheme.typography.bodySmall)
                                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                         OutlinedButton(onClick = { vm.chamNhanh(nv.id, 1.0, false) }) { Text("Chấm 1 công") }
                                         OutlinedButton(onClick = { vm.chamNhanh(nv.id, 0.5, false) }) { Text("0.5 công") }
                                         OutlinedButton(onClick = { nvMoRong = if (moRong) null else nv.id }) { Text(if (moRong) "Đóng" else "Thưởng/Ứng") }
+                                    }
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        OutlinedButton(onClick = {
+                                            if (nvSua == nv.id) nvSua = null
+                                            else {
+                                                nvSua = nv.id; eTen = nv.hoTen; eSdt = nv.sdt; eDc = nv.diaChi
+                                                eStk = nv.stk; eGhiChu = nv.ghiChu; eCap = nv.capBacId; eTrangThai = nv.trangThai
+                                            }
+                                        }, modifier = Modifier.weight(1f)) { Text(if (nvSua == nv.id) "Đóng sửa" else "✏️ Sửa thông tin") }
+                                        OutlinedButton(onClick = { vm.xoaNhanVien(nv.id) }, modifier = Modifier.weight(1f)) { Text("Cho nghỉ việc") }
+                                    }
+                                    if (nvSua == nv.id) {
+                                        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
+                                            Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                                Text("Sửa thông tin ${nv.maNv}", fontWeight = FontWeight.Bold)
+                                                OutlinedTextField(eTen, { eTen = it }, label = { Text("Họ tên (*)") }, modifier = Modifier.fillMaxWidth())
+                                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                    OutlinedTextField(eSdt, { eSdt = it.filter(Char::isDigit) }, label = { Text("SĐT") }, modifier = Modifier.weight(1f), singleLine = true)
+                                                    OutlinedTextField(eStk, { eStk = it }, label = { Text("STK ngân hàng") }, modifier = Modifier.weight(1f), singleLine = true)
+                                                }
+                                                OutlinedTextField(eDc, { eDc = it }, label = { Text("Địa chỉ") }, modifier = Modifier.fillMaxWidth())
+                                                OutlinedTextField(eGhiChu, { eGhiChu = it }, label = { Text("Ghi chú") }, modifier = Modifier.fillMaxWidth())
+                                                Text("Cấp bậc:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                                                dsCap.forEach { cap ->
+                                                    AssistChip(onClick = { eCap = cap.id }, label = { Text((if (eCap == cap.id) "✓ " else "") + cap.ten) })
+                                                }
+                                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                    AssistChip(onClick = { eTrangThai = "DANGLAM" }, label = { Text((if (eTrangThai == "DANGLAM") "✓ " else "") + "Đang làm") })
+                                                    AssistChip(onClick = { eTrangThai = "TAMNGHI" }, label = { Text((if (eTrangThai == "TAMNGHI") "✓ " else "") + "Tạm nghỉ") })
+                                                    AssistChip(onClick = { eTrangThai = "NGHIVIEC" }, label = { Text((if (eTrangThai == "NGHIVIEC") "✓ " else "") + "Nghỉ việc") })
+                                                }
+                                                Button(onClick = {
+                                                    if (eCap != null) {
+                                                        vm.suaNhanVien(nv.id, eTen, eSdt, eDc, eCap!!, eStk, eGhiChu, eTrangThai)
+                                                        nvSua = null
+                                                    }
+                                                }, enabled = eCap != null, modifier = Modifier.fillMaxWidth()) { Text("Lưu thay đổi") }
+                                            }
+                                        }
                                     }
                                     if (moRong) {
                                         OutlinedTextField(oTienTP, { oTienTP = it.filter(Char::isDigit) }, label = { Text("Số tiền (VNĐ)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
