@@ -97,6 +97,26 @@ class ChiTietDonViewModel @Inject constructor(
         }.onFailure { tb = it.message ?: "Đổi thất bại" }
     }
 
+    /** Sửa đơn: giảm giá / ghi chú / ngày hẹn — tiền tự tính lại. */
+    fun suaDon(giamMoi: Long, ghiChuMoi: String) = viewModelScope.launch {
+        runCatching {
+            val id = don?.id ?: return@launch
+            repo.suaDon(id, giamMoi, ghiChuMoi, don?.ngayHen)
+            tb = "Đã cập nhật đơn (tiền tự tính lại)"
+            tai(id)
+        }.onFailure { tb = it.message ?: "Sửa thất bại" }
+    }
+
+    /** Xóa 1 dòng thu tiền để điều chỉnh công nợ. */
+    fun xoaThu(ttId: String) = viewModelScope.launch {
+        runCatching {
+            val id = don?.id ?: return@launch
+            repo.xoaThanhToan(ttId, id)
+            tb = "Đã xóa dòng thu (công nợ tự tính lại)"
+            tai(id)
+        }.onFailure { tb = it.message ?: "Xóa thất bại" }
+    }
+
     /** Xuất hóa đơn PDF (có VAT theo cài đặt) ra file do người dùng chọn. */
     fun xuatHoaDonPdf(uri: android.net.Uri) = viewModelScope.launch {
         runCatching {
@@ -209,7 +229,31 @@ fun ManHinhChiTietDon(donId: String, vm: ChiTietDonViewModel = hiltViewModel()) 
         if (vm.lichSuThu.isNotEmpty()) {
             Text("Lịch sử thu tiền (${vm.lichSuThu.size} lần):", fontWeight = FontWeight.Bold)
             vm.lichSuThu.forEach { tt ->
-                Text("- ${dinhDangNgay(tt.ngay)}: ${dinhDangTien(tt.soTien)} (${if (tt.phuongThuc == "CK") "Chuyển khoản" else "Tiền mặt"})${if (tt.ghiChu.isNotEmpty()) " - ${tt.ghiChu}" else ""}")
+                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest)) {
+                    Row(Modifier.padding(10.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("- ${dinhDangNgay(tt.ngay)}: ${dinhDangTien(tt.soTien)} (${if (tt.phuongThuc == "CK") "Chuyển khoản" else "Tiền mặt"})${if (tt.ghiChu.isNotEmpty()) " - ${tt.ghiChu}" else ""}", modifier = Modifier.weight(1f))
+                        OutlinedButton(onClick = { vm.xoaThu(tt.id) }) { Text("Xóa") }
+                    }
+                }
+            }
+        }
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
+            var moSua by remember(don.id) { mutableStateOf(false) }
+            var oGiamMoi by remember(don.id) { mutableStateOf(don.giamGia.toString()) }
+            var oGhiChuMoi by remember(don.id) { mutableStateOf(don.ghiChu) }
+            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("Điều chỉnh đơn (giảm giá / ghi chú):", fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                    OutlinedButton(onClick = { moSua = !moSua }) { Text(if (moSua) "Đóng" else "Sửa") }
+                }
+                if (moSua) {
+                    OutlinedTextField(oGiamMoi, { oGiamMoi = it.filter(Char::isDigit) }, label = { Text("Giảm giá mới (VNĐ)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                    OutlinedTextField(oGhiChuMoi, { oGhiChuMoi = it }, label = { Text("Ghi chú") }, modifier = Modifier.fillMaxWidth())
+                    Button(onClick = {
+                        vm.suaDon(oGiamMoi.toLongOrNull() ?: 0L, oGhiChuMoi)
+                        moSua = false
+                    }, modifier = Modifier.fillMaxWidth()) { Text("Lưu thay đổi (tiền tự tính lại)") }
+                }
             }
         }
         Text("Đổi trạng thái:", fontWeight = FontWeight.Bold)

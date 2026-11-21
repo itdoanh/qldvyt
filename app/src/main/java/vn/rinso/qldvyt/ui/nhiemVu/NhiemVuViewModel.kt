@@ -52,4 +52,16 @@ class NhiemVuViewModel @Inject constructor(
         runCatching { repo.huy(id); thongBao.value = "Đã hủy việc" }
             .onFailure { thongBao.value = it.message ?: "Thất bại" }
     }
+
+    fun suaViec(id: String, ten: String, nvId: String, tongGia: Long, tyLe: Double) = viewModelScope.launch {
+        runCatching {
+            repo.suaViec(id, ten, nvId, tongGia, tyLe)
+            thongBao.value = "Đã cập nhật nhiệm vụ"
+        }.onFailure { thongBao.value = it.message ?: "Sửa thất bại" }
+    }
+
+    fun xoaViec(id: String) = viewModelScope.launch {
+        runCatching { repo.xoaViec(id); thongBao.value = "Đã xóa nhiệm vụ" }
+            .onFailure { thongBao.value = it.message ?: "Xóa thất bại" }
+    }
 }

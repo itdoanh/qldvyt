@@ -68,6 +68,9 @@ fun ManHinhNhiemVu(vm: NhiemVuViewModel = hiltViewModel()) {
     var oTen by remember { mutableStateOf("") }
     var oGia by remember { mutableStateOf("") }
     var loaiChon by remember { mutableStateOf("TIEM_TRUYEN") }
+    var suaId by remember { mutableStateOf<String?>(null) }
+    var sTen by remember { mutableStateOf("") }
+    var sGia by remember { mutableStateOf("") }
 
     val mapNv = dsNv.associateBy { it.id }
     // Gợi ý NV rảnh: đếm việc chưa xong của từng NV
@@ -155,6 +158,29 @@ fun ManHinhNhiemVu(vm: NhiemVuViewModel = hiltViewModel()) {
                                     if (viec.trangThai == "DAGIAO" || viec.trangThai == "DANGLAM") {
                                         Button(onClick = { vm.hoanThanh(viec.id) }) { Text("Hoàn thành") }
                                         OutlinedButton(onClick = { vm.huy(viec.id) }) { Text("Hủy") }
+                                    }
+                                    OutlinedButton(onClick = {
+                                        if (suaId == viec.id) suaId = null
+                                        else { suaId = viec.id; sTen = viec.tenCongViec; sGia = viec.tongGia.toString() }
+                                    }) { Text(if (suaId == viec.id) "Đóng" else "Sửa") }
+                                    if (viec.trangThai != "HOANTHANH") OutlinedButton(onClick = { vm.xoaViec(viec.id) }) { Text("Xóa") }
+                                }
+                                if (suaId == viec.id) {
+                                    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
+                                        Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                            OutlinedTextField(sTen, { sTen = it }, label = { Text("Tên công việc (*)") }, modifier = Modifier.fillMaxWidth())
+                                            OutlinedTextField(sGia, { sGia = it.filter(Char::isDigit) }, label = { Text("Tổng giá (VNĐ)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                                            Text("Đổi NV phụ trách:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                                            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                                items(dsNv.take(12), key = { it.id }) { nv ->
+                                                    AssistChip(onClick = { vm.suaViec(viec.id, sTen.ifBlank { viec.tenCongViec }, nv.id, sGia.toLongOrNull() ?: viec.tongGia, viec.tyLeHuong); suaId = null }, label = { Text(nv.hoTen) })
+                                                }
+                                            }
+                                            Button(onClick = {
+                                                vm.suaViec(viec.id, sTen.ifBlank { viec.tenCongViec }, viec.nhanVienId, sGia.toLongOrNull() ?: viec.tongGia, viec.tyLeHuong)
+                                                suaId = null
+                                            }, modifier = Modifier.fillMaxWidth()) { Text("Lưu (tiền NV tự tính lại)") }
+                                        }
                                     }
                                 }
                             }

@@ -321,5 +321,88 @@ suspend fun seedNeuChuaCo(db: QldvytDatabase, caiDat: CaiDat) {
         }
     } catch (_: Exception) { }
 
+    // 11. Dữ liệu full tháng TRƯỚC: mỗi ngày đều có đơn + thu tiền + chấm công + nhiệm vụ
+    // Mục đích: biểu đồ từng ngày, tuổi nợ, lương tháng trước đều có số liệu test.
+    try {
+        var thangTrc = thang - 1; var namTrc = nam
+        if (thangTrc < 0) { thangTrc = 11; namTrc -= 1 }
+        val calTrc = Calendar.getInstance().apply { set(namTrc, thangTrc, 1, 0, 0, 0); set(Calendar.MILLISECOND, 0) }
+        val soNgayTrc = calTrc.getActualMaximum(Calendar.DAY_OF_MONTH)
+        fun millisTrc(ngay: Int, h: Int = 9): Long {
+            val c = Calendar.getInstance().apply { set(namTrc, thangTrc, ngay.coerceIn(1, soNgayTrc), h, 0, 0); set(Calendar.MILLISECOND, 0) }
+            return c.timeInMillis
+        }
+        fun dauNgayTrc(ngay: Int): Long {
+            val c = Calendar.getInstance().apply { set(namTrc, thangTrc, ngay.coerceIn(1, soNgayTrc), 0, 0, 0); set(Calendar.MILLISECOND, 0) }
+            return c.timeInMillis
+        }
+        val tuTrc = dauNgayTrc(1)
+        val denTrc = millisTrc(soNgayTrc, 23)
+        val donTrcHienCo = try { donDao.trongKy(tuTrc, denTrc).size } catch (_: Exception) { 99 }
+        if (donTrcHienCo == 0 && dsKh.isNotEmpty() && dsNv.isNotEmpty()) {
+            val dvMap = try { dvDao.tatCa().first() } catch (_: Exception) { emptyList() }
+            val dvIds = dvMap.map { it.id }.ifEmpty { listOf("dv-tiem-truyen") }
+            val ccDao = db.chamCongDao()
+            // Chấm công full tháng trước cho 12 NV (nghỉ Chủ nhật)
+            dsNv.take(12).forEachIndexed { i, nv ->
+                (1..soNgayTrc).forEach { ng ->
+                    try {
+                        val c = Calendar.getInstance().apply { timeInMillis = dauNgayTrc(ng) }
+                        val cn = c.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY
+                        if (!cn) {
+                            val muon = (i + ng) % 11 == 0
+                            val cong = if ((i + ng) % 13 == 0) 0.5 else 1.0
+                            ccDao.cham(vn.rinso.qldvyt.data.local.ChamCong(uuid(), nv.id, dauNgayTrc(ng), cong, muon, ""))
+                        }
+                    } catch (_: Exception) { }
+                }
+            }
+            // Mỗi ngày 1-2 đơn hoàn thành + ngày chẵn thêm đơn nợ trả góp
+            var dem = 0
+            (1..soNgayTrc).forEach { ng ->
+                val dvId1 = dvIds[(ng + dem) % dvIds.size]
+                val d1 = dvMap.firstOrNull { it.id == dvId1 }
+                val ten1 = d1?.ten ?: "Tiêm truyền tại nhà"
+                val gia1 = d1?.giaNiemYet ?: 350_000L
+                val giam1 = if (ng % 4 == 0) 30_000L else 0L
+                val tong1 = maxOf(0L, gia1 - giam1)
+                val donId1 = uuid()
+                val kh1 = dsKh[(ng + dem) % dsKh.size]
+                donDao.them(DonHang(id = donId1, maDh = "DH-T%02d-%02d".format(thangTrc + 1, ng), khachHangId = kh1.id, ngayTao = millisTrc(ng), ngayHen = null, trangThai = "HOAN_THANH", tongTienHang = gia1, giamGia = giam1, tienVat = 0L, tyLeVat = 0.0, tongThanhToan = tong1, daThu = tong1, conNo = 0L, ghiChu = "Seed tháng trước"))
+                ctDao.them(DonHangChiTiet(uuid(), donId1, dichVuId = dvId1, tenHienThi = ten1, soLuong = 1.0, donGia = gia1, thanhTien = gia1))
+                ttDao.them(ThanhToan(uuid(), donId1, kh1.id, millisTrc(ng, 16), tong1, if (ng % 2 == 0) "CK" else "TIENMAT", null, "Thu đủ T${thangTrc + 1}"))
+                dem++
+                if (ng % 3 == 0) {
+                    // Đơn nợ trả góp 1 phần trong tháng trước (để test tuổi nợ)
+                    val dvId2 = dvIds[(ng * 2) % dvIds.size]
+                    val d2 = dvMap.firstOrNull { it.id == dvId2 }
+                    val gia2 = (d2?.giaNiemYet ?: 500_000L) * 2
+                    val kh2 = dsKh[(ng * 3) % dsKh.size]
+                    val daThu2 = gia2 / 3
+                    val donId2 = uuid()
+                    donDao.them(DonHang(id = donId2, maDh = "DH-T%02d-N%02d".format(thangTrc + 1, ng), khachHangId = kh2.id, ngayTao = millisTrc(ng, 11), ngayHen = null, trangThai = "DANG_LAM", tongTienHang = gia2, giamGia = 0L, tienVat = 0L, tyLeVat = 0.0, tongThanhToan = gia2, daThu = daThu2, conNo = gia2 - daThu2, ghiChu = "Nợ tháng trước"))
+                    ctDao.them(DonHangChiTiet(uuid(), donId2, dichVuId = dvId2, tenHienThi = d2?.ten ?: "Dịch vụ", soLuong = 2.0, donGia = gia2 / 2, thanhTien = gia2))
+                    ttDao.them(ThanhToan(uuid(), donId2, kh2.id, millisTrc(ng, 15), daThu2, "TIENMAT", null, "Cọc tháng trước"))
+                }
+            }
+            // Nhiệm vụ + thưởng/phạt/tạm ứng rải đều tháng trước
+            try {
+                val nvRepo = vn.rinso.qldvyt.data.repo.NhiemVuRepository(db)
+                (1..soNgayTrc step 2).forEach { ng ->
+                    val nv = dsNv[(ng * 7) % dsNv.size]
+                    val id = nvRepo.giaoViec(nv.id, "Việc ngày $ng/T${thangTrc + 1}", if (ng % 3 == 0) "TIEM_TRUYEN" else "KHAC", 300_000L + (ng * 10_000L), 0.30)
+                    if (ng % 4 != 0) { nvRepo.nhanViec(id); nvRepo.hoanThanh(id) }
+                }
+            } catch (_: Exception) { }
+            try {
+                val tpDao = db.thuongPhatDao(); val tuDao = db.tamUngDao()
+                dsNv.take(10).forEachIndexed { i, nv ->
+                    tpDao.them(vn.rinso.qldvyt.data.local.ThuongPhat(uuid(), nv.id, millisTrc(12 + (i % 10)), if (i % 3 == 0) "PHAT" else "THUONG", if (i % 3 == 0) -100_000L else 200_000L, "Seed T${thangTrc + 1}"))
+                    tuDao.them(vn.rinso.qldvyt.data.local.TamUng(uuid(), nv.id, millisTrc(8), 400_000L + i * 100_000L, "Tạm ứng T${thangTrc + 1}"))
+                }
+            } catch (_: Exception) { }
+        }
+    } catch (_: Exception) { }
+
     try { caiDat.danhDauDaSeed() } catch (_: Exception) { }
 }

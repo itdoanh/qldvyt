@@ -53,39 +53,59 @@ class PdfExporter @Inject constructor(@ApplicationContext private val ctx: Conte
         chanTrang: List<String> = emptyList(),
     ) {
         val w = 595; val h = 842 // A4 72dpi
-        var page = doc.startPage(PdfDocument.PageInfo.Builder(w, h, 1).create())
+        var soTrang = 1
+        var page = doc.startPage(PdfDocument.PageInfo.Builder(w, h, soTrang).create())
         var y = 56f
         val den = 0xFF111111.toInt(); val xam = 0xFF555555.toInt()
         val pTieuDe = paint(0xFF00695C.toInt(), 20f, true)
         val pCty = paint(xam, 11f); val pThuong = paint(den, 12f); val pDam = paint(den, 12f, true)
+        fun trangMoi() {
+            doc.finishPage(page)
+            soTrang += 1
+            page = doc.startPage(PdfDocument.PageInfo.Builder(w, h, soTrang).create())
+            y = 56f
+        }
         page.canvas.drawText(tieuDe, 40f, y, pTieuDe); y += 22f
         page.canvas.drawText(cty.ten, 40f, y, pDam); y += 16f
         page.canvas.drawText("Đ/c: ${cty.diaChi} — ĐT: ${cty.sdt}" + if (cty.maSoThue.isNotBlank()) " — MST: ${cty.maSoThue}" else "", 40f, y, pCty); y += 8f
         page.canvas.drawLine(40f, y, (w - 40).toFloat(), y, Paint().apply { strokeWidth = 2f; color = 0xFF00695C.toInt() })
         y += 20f
         dong.forEachIndexed { i, s ->
-            if (y > h - 90) { doc.finishPage(page); page = doc.startPage(PdfDocument.PageInfo.Builder(w, h, 1).create()); y = 56f }
+            if (y > h - 90) { trangMoi() }
             // Xuống dòng thủ công nếu quá dài
             var line = s; val p = if (i in dongDam) pDam else pThuong
             while (line.length > 72) {
                 page.canvas.drawText(line.take(72), 40f, y, p); y += 17f
                 line = line.drop(72)
-                if (y > h - 90) { doc.finishPage(page); page = doc.startPage(PdfDocument.PageInfo.Builder(w, h, 1).create()); y = 56f }
+                if (y > h - 90) { trangMoi() }
             }
             page.canvas.drawText(line, 40f, y, p); y += 17f
         }
         if (chanTrang.isNotEmpty()) {
             y += 10f
+            if (y > h - 110) { trangMoi() }
             chanTrang.forEach { s -> page.canvas.drawText(s, 40f, y, pCty); y += 16f }
         }
         val stamp = SimpleDateFormat("dd/MM/yyyy HH:mm", VI).format(Date())
-        page.canvas.drawText("In lúc $stamp — Rinso QLDVYT (offline)", 40f, (h - 40).toFloat(), pCty)
+        page.canvas.drawText("In lúc $stamp — Rinso QLDVYT (offline) — Trang $soTrang", 40f, (h - 40).toFloat(), pCty)
         doc.finishPage(page)
     }
 
     private fun ghi(doc: PdfDocument, uri: Uri) {
-        ctx.contentResolver.openOutputStream(uri, "wt")?.use { doc.writeTo(it) }
-        doc.close()
+        // SAF file nhị phân (PDF): dùng openOutputStream(mode "w"), writeTo + flush + fd.sync.
+        // Không dùng "wt" (text) — nhiều máy ra file 0KB. Page number tăng dần để PDF nhiều trang không bị trắng.
+        require(doc.pages.isNotEmpty()) { "PDF chưa có trang nào — không ghi file rỗng" }
+        try {
+            ctx.contentResolver.openOutputStream(uri, "w")?.use { out ->
+                java.io.BufferedOutputStream(out).use { buf ->
+                    doc.writeTo(buf)
+                    buf.flush()
+                }
+                try { out.flush() } catch (_: Exception) { }
+            } ?: error("Không mở được file để ghi PDF")
+        } finally {
+            try { doc.close() } catch (_: Exception) { }
+        }
     }
 
     /** Hóa đơn bán hàng / phiếu thu cho 1 đơn (có VAT theo cài đặt). */

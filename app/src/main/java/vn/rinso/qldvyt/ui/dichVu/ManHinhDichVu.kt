@@ -17,6 +17,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
@@ -55,6 +56,12 @@ fun ManHinhDichVu(vm: DichVuViewModel = hiltViewModel()) {
     var oGia by remember { mutableStateOf("") }
     var oDv by remember { mutableStateOf("lần") }
     var oChiuThue by remember { mutableStateOf(true) }
+    var suaDvId by remember { mutableStateOf<String?>(null) }
+    var sTenDv by remember { mutableStateOf("") }
+    var sGiaDv by remember { mutableStateOf("") }
+    var suaGoiId by remember { mutableStateOf<String?>(null) }
+    var sTenGoi by remember { mutableStateOf("") }
+    var sGiaGoi by remember { mutableStateOf("") }
 
     // Thống kê đã bán từ chi tiết đơn (snapshot)
     val banTheoDv = dsCt.filter { it.dichVuId != null }.groupBy { it.dichVuId }
@@ -140,6 +147,25 @@ fun ManHinhDichVu(vm: DichVuViewModel = hiltViewModel()) {
                                     Text(if (dv.chiuThue) "✓ Chịu thuế VAT" else "○ Miễn VAT", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold, color = if (dv.chiuThue) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline)
                                     Switch(checked = dv.chiuThue, onCheckedChange = { vm.doiChiuThue(dv, it) })
                                 }
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    OutlinedButton(onClick = {
+                                        if (suaDvId == dv.id) suaDvId = null
+                                        else { suaDvId = dv.id; sTenDv = dv.ten; sGiaDv = dv.giaNiemYet.toString() }
+                                    }) { Text(if (suaDvId == dv.id) "Đóng" else "Sửa") }
+                                    OutlinedButton(onClick = { vm.xoaDichVu(dv) }) { Text("Xóa") }
+                                }
+                                if (suaDvId == dv.id) {
+                                    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
+                                        Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                            OutlinedTextField(sTenDv, { sTenDv = it }, label = { Text("Tên dịch vụ (*)") }, modifier = Modifier.fillMaxWidth())
+                                            OutlinedTextField(sGiaDv, { sGiaDv = it.filter(Char::isDigit) }, label = { Text("Giá (VNĐ)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                                            Button(onClick = {
+                                                vm.suaDichVu(dv, sTenDv.ifBlank { dv.ten }, sGiaDv.toLongOrNull() ?: dv.giaNiemYet, dv.donVi, dv.nhom)
+                                                suaDvId = null
+                                            }, modifier = Modifier.fillMaxWidth()) { Text("Lưu (đơn cũ giữ giá snapshot)") }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -151,13 +177,32 @@ fun ManHinhDichVu(vm: DichVuViewModel = hiltViewModel()) {
                         val cts = banTheoGoi[goi.id] ?: emptyList()
                         val dt = cts.sumOf { it.thanhTien }
                         Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest)) {
-                            Column(Modifier.padding(12.dp).fillMaxWidth()) {
+                            Column(Modifier.padding(12.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                     Text(goi.ten + " (GÓI)", fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                                     Text(dinhDangTien(goi.giaGoi), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                                 }
                                 Text("${goi.maGoi} - Đã bán: ${cts.size} lần - DT: ${dinhDangTien(dt)}", style = MaterialTheme.typography.bodySmall)
                                 if (goi.moTa.isNotEmpty()) Text(goi.moTa, style = MaterialTheme.typography.bodySmall)
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    OutlinedButton(onClick = {
+                                        if (suaGoiId == goi.id) suaGoiId = null
+                                        else { suaGoiId = goi.id; sTenGoi = goi.ten; sGiaGoi = goi.giaGoi.toString() }
+                                    }) { Text(if (suaGoiId == goi.id) "Đóng" else "Sửa") }
+                                    OutlinedButton(onClick = { vm.xoaGoi(goi) }) { Text("Xóa") }
+                                }
+                                if (suaGoiId == goi.id) {
+                                    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
+                                        Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                            OutlinedTextField(sTenGoi, { sTenGoi = it }, label = { Text("Tên gói (*)") }, modifier = Modifier.fillMaxWidth())
+                                            OutlinedTextField(sGiaGoi, { sGiaGoi = it.filter(Char::isDigit) }, label = { Text("Giá (VNĐ)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                                            Button(onClick = {
+                                                vm.suaGoi(goi, sTenGoi.ifBlank { goi.ten }, sGiaGoi.toLongOrNull() ?: goi.giaGoi)
+                                                suaGoiId = null
+                                            }, modifier = Modifier.fillMaxWidth()) { Text("Lưu") }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }

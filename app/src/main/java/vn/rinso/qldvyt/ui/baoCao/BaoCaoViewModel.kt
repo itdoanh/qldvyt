@@ -160,6 +160,21 @@ class BaoCaoViewModel @Inject constructor(
         donDao.doanhThu(tu, den)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
 
+    /** Xu hướng 6 tháng gần nhất (để vẽ biểu đồ đường): tháng + doanh thu. */
+    data class CotThang(val nhan: String, val tong: Long)
+    val xuHuong6Thang = thangNam.flatMapLatest { (t, n) ->
+        flow {
+            val list = (5 downTo 0).map { lui ->
+                var tt = t - lui; var nn = n
+                while (tt <= 0) { tt += 12; nn -= 1 }
+                val (tu, den) = dauCuoiThang(tt, nn)
+                val dt = try { donDao.doanhThuMotLan(tu, den) } catch (_: Exception) { 0L }
+                CotThang("$tt", dt)
+            }
+            emit(list)
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     fun xuatCsvDon(uri: Uri) = viewModelScope.launch {
         runCatching {
             val ds = dsDonThang.value

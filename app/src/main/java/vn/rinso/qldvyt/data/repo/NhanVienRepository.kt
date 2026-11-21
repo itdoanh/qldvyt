@@ -71,4 +71,14 @@ class NhanVienRepository @Inject constructor(private val db: QldvytDatabase) {
             )
         )
     }
+
+    fun tamUngTheoKy(nvId: String, tu: Long, den: Long): Flow<List<TamUng>> =
+        db.tamUngDao().theoKy(nvId, tu, den)
+
+    fun thuongPhatTheoKy(nvId: String, tu: Long, den: Long): Flow<List<ThuongPhat>> =
+        db.thuongPhatDao().theoKy(nvId, tu, den)
+
+    suspend fun xoaTamUng(id: String) = db.tamUngDao().xoa(id)
+
+    suspend fun xoaThuongPhat(id: String) = db.thuongPhatDao().xoa(id)
 }

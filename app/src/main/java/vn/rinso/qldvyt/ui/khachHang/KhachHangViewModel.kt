@@ -40,4 +40,19 @@ class KhachHangViewModel @Inject constructor(
             thongBao.value = "Đã thêm khách hàng $hoTen"
         }.onFailure { thongBao.value = it.message ?: "Thêm thất bại" }
     }
+
+    fun sua(kh: KhachHang, hoTen: String, sdt: String, diaChi: String, ghiChu: String) = viewModelScope.launch {
+        runCatching {
+            require(hoTen.isNotBlank()) { "Nhập họ tên khách hàng" }
+            dao.sua(kh.copy(hoTen = hoTen.trim(), sdt = sdt.trim(), diaChi = diaChi.trim(), ghiChu = ghiChu.trim()))
+            thongBao.value = "Đã cập nhật khách hàng $hoTen"
+        }.onFailure { thongBao.value = it.message ?: "Sửa thất bại" }
+    }
+
+    fun xoa(kh: KhachHang) = viewModelScope.launch {
+        runCatching {
+            dao.xoa(kh.id)
+            thongBao.value = "Đã xóa khách hàng ${kh.hoTen}"
+        }.onFailure { thongBao.value = "Không xóa được (KH đã có đơn) — hãy giữ lại lịch sử" }
+    }
 }

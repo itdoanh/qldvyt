@@ -3,6 +3,7 @@ package vn.rinso.qldvyt.ui.donHang
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -56,6 +57,9 @@ fun ManHinhTaoDon(
     var oGiam by remember { mutableStateOf("") }
     var tkKh by remember { mutableStateOf("") }
     var tkDv by remember { mutableStateOf("") }
+    var laVangLai by remember { mutableStateOf(false) }
+    var tenVangLai by remember { mutableStateOf("") }
+    var sdtVangLai by remember { mutableStateOf("") }
 
     val tongHang = mhChon.sumOf { (it.soLuong * it.donGia).toLong() }
     val giam = oGiam.toLongOrNull() ?: 0L
@@ -86,6 +90,20 @@ fun ManHinhTaoDon(
         if (tb.isNotEmpty()) Card { Text(tb, Modifier.padding(12.dp)) }
 
         if (buoc == 1) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                AssistChip(onClick = { laVangLai = false }, label = { Text((if (!laVangLai) "✓ " else "") + "Khách có hồ sơ") })
+                AssistChip(onClick = { laVangLai = true }, label = { Text((if (laVangLai) "✓ " else "") + "Khách vãng lai") })
+            }
+            if (laVangLai) {
+                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
+                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Khách vãng lai — không cần tạo hồ sơ trước, chỉ ghi tên:", fontWeight = FontWeight.Bold)
+                        OutlinedTextField(tenVangLai, { tenVangLai = it }, label = { Text("Tên khách (*)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                        OutlinedTextField(sdtVangLai, { sdtVangLai = it.filter(Char::isDigit) }, label = { Text("SĐT (nếu có)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                    }
+                }
+                Spacer(Modifier.weight(1f))
+            } else {
             OTimKiem(tkKh, { tkKh = it }, "Tìm khách theo tên / SĐT...")
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.weight(1f)) {
                 items(khLoc.take(30), key = { it.id }) { kh ->
@@ -103,7 +121,9 @@ fun ManHinhTaoDon(
                     }
                 }
             }
-            Button(onClick = { buoc = 2 }, enabled = khachChon != null, modifier = Modifier.fillMaxWidth()) {
+            }
+            val duocTiep = if (laVangLai) tenVangLai.isNotBlank() else khachChon != null
+            Button(onClick = { buoc = 2 }, enabled = duocTiep, modifier = Modifier.fillMaxWidth()) {
                 Text("Tiếp tục → chọn dịch vụ")
             }
         } else if (buoc == 2) {
@@ -163,7 +183,15 @@ fun ManHinhTaoDon(
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = { buoc = 2 }, modifier = Modifier.weight(1f)) { Text("← Quay lại") }
-                Button(onClick = { vm.giamGia.value = giam; vm.taoDon { onXong() } }, modifier = Modifier.weight(1f)) { Text("Tạo đơn") }
+                Button(
+                    onClick = {
+                        vm.giamGia.value = giam
+                        if (laVangLai) vm.taoDonVangLai(tenVangLai, sdtVangLai) { onXong() }
+                        else vm.taoDon { onXong() }
+                    },
+                    enabled = mhChon.isNotEmpty() && (!laVangLai || tenVangLai.isNotBlank()),
+                    modifier = Modifier.weight(1f),
+                ) { Text(if (laVangLai) "Tạo đơn vãng lai" else "Tạo đơn") }
             }
         }
     }

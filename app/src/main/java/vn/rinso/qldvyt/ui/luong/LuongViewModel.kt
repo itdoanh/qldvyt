@@ -22,7 +22,7 @@ class LuongViewModel @Inject constructor(
     private val repo: LuongRepository,
     private val pdf: PdfExporter,
     private val caiDat: CaiDat,
-    nhanVienDao: vn.rinso.qldvyt.data.local.NhanVienDao,
+    private val nhanVienDao: vn.rinso.qldvyt.data.local.NhanVienDao,
     private val capBacDao: vn.rinso.qldvyt.data.local.CapBacDao,
 ) : ViewModel() {
     val dsNv = nhanVienDao.tatCa()
@@ -67,11 +67,22 @@ class LuongViewModel @Inject constructor(
         sdt = caiDat.sdtCongTy.first(), maSoThue = caiDat.maSoThue.first(),
     )
 
+    /** NV đang chờ xuất phiếu (tránh lỗi closure stale khiến file SAF tạo ra 0KB mà không ghi). */
+    var pendingXuatNv: String? = null
+
     /** Xuất phiếu lương PDF cho 1 nhân viên. */
     fun xuatPhieuLuong(nvId: String, uri: android.net.Uri) = viewModelScope.launch {
         runCatching {
-            val bl = dsBangLuong.value.firstOrNull { it.nhanVienId == nvId } ?: error("Chưa có bảng lương — hãy bấm Tính lương cả tháng")
-            val nv = nvTheoId(nvId) ?: error("Không tìm thấy nhân viên")
+            // Lấy tươi từ DB (không phụ thuộc StateFlow màn hình) để tránh file rỗng/0KB
+            // khi dsBangLuong chưa kịp load hoặc đã chuyển tháng.
+            val bl = try {
+                repo.theoThang(thang.value, nam.value).first()
+                    .firstOrNull { it.nhanVienId == nvId }
+            } catch (_: Exception) { null }
+                ?: dsBangLuong.value.firstOrNull { it.nhanVienId == nvId }
+                ?: error("Chưa có bảng lương — hãy bấm Tính lương cả tháng")
+            val nv = try { nhanVienDao.theoId(nvId) } catch (_: Exception) { null }
+                ?: nvTheoId(nvId) ?: error("Không tìm thấy nhân viên")
             val capTen = tenCapBac(nv.capBacId)
             pdf.xuatPhieuLuong(uri, bl, nv, capTen, thongTinCty())
             thongBao.value = "Đã xuất phiếu lương PDF: ${nv.hoTen}"
@@ -81,16 +92,64 @@ class LuongViewModel @Inject constructor(
     /** Xuất bảng lương tổng hợp cả tháng ra PDF. */
     fun xuatBangTongHop(uri: android.net.Uri) = viewModelScope.launch {
         runCatching {
-            val ds = dsBangLuong.value
-            require(ds.isNotEmpty()) { "Chưa có bảng lương — hãy bấm Tính lương cả tháng" }
-            val mapNv = dsNv.value.associateBy { it.id }
-            val rows = ds.mapNotNull { bl ->
+            val ds = try {
+                repo.theoThang(thang.value, nam.value).first()
+            } catch (_: Exception) { dsBangLuong.value }
+            val dsDung = if (ds.isNotEmpty()) ds else dsBangLuong.value
+            require(dsDung.isNotEmpty()) { "Chưa có bảng lương — hãy bấm Tính lương cả tháng" }
+            val mapNv = try {
+                nhanVienDao.tatCa().first().associateBy { it.id }
+            } catch (_: Exception) { dsNv.value.associateBy { it.id } }
+            val rows = dsDung.mapNotNull { bl ->
                 val nv = mapNv[bl.nhanVienId] ?: return@mapNotNull null
                 val capTen = try { capBacDao.theoId(nv.capBacId)?.ten ?: "" } catch (_: Exception) { "" }
                 Triple(nv, bl, capTen)
             }
+            require(rows.isNotEmpty()) { "Không khớp nhân viên — hãy Tính lương cả tháng rồi xuất lại" }
             pdf.xuatBangLuongThang(uri, thang.value, nam.value, rows, thongTinCty())
             thongBao.value = "Đã xuất bảng lương tổng hợp PDF (${rows.size} nhân viên)"
         }.onFailure { thongBao.value = it.message ?: "Xuất PDF thất bại" }
+    }
+
+    // ===== Sửa tạm ứng / thưởng-phạt từng NV trong tháng đang xem =====
+    fun tamUngKy(nvId: String): kotlinx.coroutines.flow.Flow<List<vn.rinso.qldvyt.data.local.TamUng>> =
+        repo.tamUngKy(nvId, thang.value, nam.value)
+
+    fun thuongPhatKy(nvId: String): kotlinx.coroutines.flow.Flow<List<vn.rinso.qldvyt.data.local.ThuongPhat>> =
+        repo.thuongPhatKy(nvId, thang.value, nam.value)
+
+    fun themTamUngThang(nvId: String, soTien: Long, lyDo: String) = viewModelScope.launch {
+        runCatching {
+            repo.themTamUng(nvId, soTien, lyDo, thang.value, nam.value)
+            thongBao.value = "Đã thêm tạm ứng ${vn.rinso.qldvyt.core.dinhDangTien(soTien)}"
+        }.onFailure { thongBao.value = it.message ?: "Thêm tạm ứng thất bại" }
+    }
+
+    fun themThuongThang(nvId: String, soTien: Long, lyDo: String) = viewModelScope.launch {
+        runCatching {
+            repo.themThuongPhat(nvId, "THUONG", soTien, lyDo, thang.value, nam.value)
+            thongBao.value = "Đã thêm thưởng ${vn.rinso.qldvyt.core.dinhDangTien(soTien)}"
+        }.onFailure { thongBao.value = it.message ?: "Thêm thưởng thất bại" }
+    }
+
+    fun themPhatThang(nvId: String, soTien: Long, lyDo: String) = viewModelScope.launch {
+        runCatching {
+            repo.themThuongPhat(nvId, "PHAT", -soTien, lyDo, thang.value, nam.value)
+            thongBao.value = "Đã thêm phạt ${vn.rinso.qldvyt.core.dinhDangTien(soTien)}"
+        }.onFailure { thongBao.value = it.message ?: "Thêm phạt thất bại" }
+    }
+
+    fun xoaTamUngThang(id: String, nvId: String) = viewModelScope.launch {
+        runCatching {
+            repo.xoaTamUng(id, nvId, thang.value, nam.value)
+            thongBao.value = "Đã xóa tạm ứng (lương tự tính lại)"
+        }.onFailure { thongBao.value = it.message ?: "Xóa thất bại" }
+    }
+
+    fun xoaThuongPhatThang(id: String, nvId: String) = viewModelScope.launch {
+        runCatching {
+            repo.xoaThuongPhat(id, nvId, thang.value, nam.value)
+            thongBao.value = "Đã xóa dòng thưởng/phạt (lương tự tính lại)"
+        }.onFailure { thongBao.value = it.message ?: "Xóa thất bại" }
     }
 }

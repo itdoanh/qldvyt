@@ -55,4 +55,35 @@ class DichVuViewModel @Inject constructor(
             thongBao.value = "Đã thêm gói $ten"
         }.onFailure { thongBao.value = it.message ?: "Thêm thất bại" }
     }
+
+    fun suaDichVu(dv: DichVu, ten: String, gia: Long, donVi: String, nhom: String) = viewModelScope.launch {
+        runCatching {
+            require(ten.isNotBlank()) { "Nhập tên dịch vụ" }
+            require(gia >= 0) { "Giá phải >= 0" }
+            dvDao.sua(dv.copy(ten = ten.trim(), giaNiemYet = gia, donVi = donVi.ifBlank { dv.donVi }, nhom = nhom))
+            thongBao.value = "Đã cập nhật dịch vụ $ten"
+        }.onFailure { thongBao.value = it.message ?: "Sửa thất bại" }
+    }
+
+    fun xoaDichVu(dv: DichVu) = viewModelScope.launch {
+        runCatching {
+            dvDao.xoa(dv.id)
+            thongBao.value = "Đã xóa dịch vụ ${dv.ten}"
+        }.onFailure { thongBao.value = "Không xóa được (đã có đơn dùng) — hãy để Ngừng bán" }
+    }
+
+    fun suaGoi(goi: GoiDichVu, ten: String, gia: Long) = viewModelScope.launch {
+        runCatching {
+            require(ten.isNotBlank()) { "Nhập tên gói" }
+            gDao.sua(goi.copy(ten = ten.trim(), giaGoi = gia.coerceAtLeast(0L)))
+            thongBao.value = "Đã cập nhật gói $ten"
+        }.onFailure { thongBao.value = it.message ?: "Sửa thất bại" }
+    }
+
+    fun xoaGoi(goi: GoiDichVu) = viewModelScope.launch {
+        runCatching {
+            gDao.xoa(goi.id)
+            thongBao.value = "Đã xóa gói ${goi.ten}"
+        }.onFailure { thongBao.value = "Không xóa được (đã có đơn dùng)" }
+    }
 }

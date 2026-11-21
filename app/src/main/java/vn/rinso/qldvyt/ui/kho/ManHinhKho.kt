@@ -52,6 +52,11 @@ fun ManHinhKho(vm: KhoViewModel = hiltViewModel()) {
     var oGia by remember { mutableStateOf("") }
     var oNcc by remember { mutableStateOf("") }
     var vtChon by remember { mutableStateOf<String?>(null) }
+    var suaId by remember { mutableStateOf<String?>(null) }
+    var sTen by remember { mutableStateOf("") }
+    var sDv by remember { mutableStateOf("") }
+    var sToiThieu by remember { mutableStateOf("") }
+    var sGiaVon by remember { mutableStateOf("") }
 
     val dsLoc = ds.filter { tk.isBlank() || it.ten.contains(tk.trim(), true) || it.maVt.contains(tk.trim(), true) }
     val triGia = ds.sumOf { (it.tonKho * it.giaNhapTB).toLong() }
@@ -135,6 +140,30 @@ fun ManHinhKho(vm: KhoViewModel = hiltViewModel()) {
                                 }
                                 Text("${vt.maVt} - Tồn: ${vt.tonKho.toInt()} ${vt.donVi} - Tối thiểu: ${vt.tonToiThieu.toInt()}", style = MaterialTheme.typography.bodySmall)
                                 Text("Vốn TB: ${dinhDangTien(vt.giaNhapTB)} - Trị giá: ${dinhDangTien((vt.tonKho * vt.giaNhapTB).toLong())}", color = MaterialTheme.colorScheme.primary)
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    OutlinedButton(onClick = { vtChon = vt.id; hienNhap = true }) { Text("Nhập") }
+                                    OutlinedButton(onClick = {
+                                        if (suaId == vt.id) suaId = null
+                                        else { suaId = vt.id; sTen = vt.ten; sDv = vt.donVi; sToiThieu = vt.tonToiThieu.toInt().toString(); sGiaVon = vt.giaNhapTB.toString() }
+                                    }) { Text(if (suaId == vt.id) "Đóng" else "Sửa") }
+                                    OutlinedButton(onClick = { vm.xoaVatTu(vt.id) }) { Text("Xóa") }
+                                }
+                                if (suaId == vt.id) {
+                                    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
+                                        Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                            OutlinedTextField(sTen, { sTen = it }, label = { Text("Tên vật tư (*)") }, modifier = Modifier.fillMaxWidth())
+                                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                OutlinedTextField(sDv, { sDv = it }, label = { Text("Đơn vị") }, modifier = Modifier.weight(1f))
+                                                OutlinedTextField(sToiThieu, { sToiThieu = it.filter(Char::isDigit) }, label = { Text("Tối thiểu") }, modifier = Modifier.weight(1f))
+                                            }
+                                            OutlinedTextField(sGiaVon, { sGiaVon = it.filter(Char::isDigit) }, label = { Text("Giá vốn TB (VNĐ)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                                            Button(onClick = {
+                                                vm.suaVatTu(vt.id, sTen.ifBlank { vt.ten }, sDv.ifBlank { vt.donVi }, sToiThieu.toDoubleOrNull() ?: vt.tonToiThieu, sGiaVon.toLongOrNull() ?: vt.giaNhapTB)
+                                                suaId = null
+                                            }, modifier = Modifier.fillMaxWidth()) { Text("Lưu thay đổi") }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }

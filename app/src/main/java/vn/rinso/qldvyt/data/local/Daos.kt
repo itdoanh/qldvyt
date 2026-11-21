@@ -68,6 +68,9 @@ interface ThuongPhatDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun them(tp: ThuongPhat)
+
+    @Query("DELETE FROM thuong_phat WHERE id = :id")
+    suspend fun xoa(id: String)
 }
 
 @Dao
@@ -75,8 +78,14 @@ interface TamUngDao {
     @Query("SELECT COALESCE(SUM(soTien),0) FROM tam_ung WHERE nhanVienId = :nvId AND ngay BETWEEN :tu AND :den")
     suspend fun tongTamUng(nvId: String, tu: Long, den: Long): Long
 
+    @Query("SELECT * FROM tam_ung WHERE nhanVienId = :nvId AND ngay BETWEEN :tu AND :den ORDER BY ngay DESC")
+    fun theoKy(nvId: String, tu: Long, den: Long): Flow<List<TamUng>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun them(tu: TamUng)
+
+    @Query("DELETE FROM tam_ung WHERE id = :id")
+    suspend fun xoa(id: String)
 }
 
 @Dao
@@ -149,6 +158,9 @@ interface NhiemVuDao {
 
     @Update
     suspend fun sua(nv: NhiemVu)
+
+    @Query("DELETE FROM nhiem_vu WHERE id = :id")
+    suspend fun xoa(id: String)
 }
 
 @Dao
@@ -161,6 +173,9 @@ interface ThanhToanDao {
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun them(tt: ThanhToan)
+
+    @Query("DELETE FROM thanh_toan WHERE id = :id")
+    suspend fun xoa(id: String)
 }
 
 @Dao
@@ -179,6 +194,9 @@ interface VatTuDao {
 
     @Update
     suspend fun sua(vt: VatTu)
+
+    @Query("DELETE FROM vat_tu WHERE id = :id")
+    suspend fun xoa(id: String)
 }
 
 @Dao
@@ -206,6 +224,12 @@ interface KhachHangDao {
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun them(kh: KhachHang)
+
+    @Update
+    suspend fun sua(kh: KhachHang)
+
+    @Query("DELETE FROM khach_hang WHERE id = :id")
+    suspend fun xoa(id: String)
 }
 
 @Dao
@@ -224,6 +248,9 @@ interface DichVuDao {
 
     @Update
     suspend fun sua(dv: DichVu)
+
+    @Query("DELETE FROM dich_vu WHERE id = :id")
+    suspend fun xoa(id: String)
 }
 
 @Dao
@@ -231,8 +258,17 @@ interface GoiDichVuDao {
     @Query("SELECT * FROM goi_dich_vu WHERE trangThai='DANGBAN' ORDER BY ten")
     fun dangBan(): Flow<List<GoiDichVu>>
 
+    @Query("SELECT * FROM goi_dich_vu ORDER BY ten")
+    fun tatCa(): Flow<List<GoiDichVu>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun them(goi: GoiDichVu)
+
+    @Update
+    suspend fun sua(goi: GoiDichVu)
+
+    @Query("DELETE FROM goi_dich_vu WHERE id = :id")
+    suspend fun xoa(id: String)
 }
 
 @Dao

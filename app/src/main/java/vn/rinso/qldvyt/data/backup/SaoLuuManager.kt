@@ -35,7 +35,8 @@ class SaoLuuManager @Inject constructor(@ApplicationContext private val ctx: Con
         val dbFile = ctx.getDatabasePath("qldvyt.db")
         // Checkpoint WAL: đảm bảo db chính đầy đủ trước khi copy (Room tự checkpoint khi close;
         // ở đây copy cả -wal/-shm kèm theo để khôi phục chắc chắn).
-        ctx.contentResolver.openOutputStream(uri, "wt")?.use { outRaw ->
+        // SAF: file nhị phân (zip/pdf) phải dùng mode "w". Dùng "wt" sẽ ra file 0KB/rỗng.
+        ctx.contentResolver.openOutputStream(uri, "w")?.use { outRaw ->
             BufferedOutputStream(outRaw).use { out ->
                 ZipOutputStream(out).use { zip ->
                     var soFile = 0
@@ -159,6 +160,6 @@ class SaoLuuManager @Inject constructor(@ApplicationContext private val ctx: Con
                 if (s.contains(",") || s.contains("\n") || s.contains("\"")) "\"$s\"" else s
             })
         }
-        ctx.contentResolver.openOutputStream(uri, "wt")?.use { it.write(sb.toString().toByteArray(Charsets.UTF_8)) }
+        ctx.contentResolver.openOutputStream(uri, "w")?.use { it.write(sb.toString().toByteArray(Charsets.UTF_8)) }
     }
 }

@@ -5,6 +5,7 @@ import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import vn.rinso.qldvyt.data.local.NhapKho
 import vn.rinso.qldvyt.data.local.QldvytDatabase
 import vn.rinso.qldvyt.data.local.VatTu
@@ -47,5 +48,24 @@ class KhoRepository @Inject constructor(private val db: QldvytDatabase) {
             )
             db.vatTuDao().sua(vt.copy(tonKho = vt.tonKho + soLuong, giaNhapTB = giaMoi))
         }
+    }
+
+    /** Sửa thông tin vật tư (tên / đơn vị / tồn tối thiểu / giá vốn). */
+    suspend fun suaVatTu(vatTuId: String, ten: String, donVi: String, tonToiThieu: Double, giaNhapTB: Long) {
+        require(ten.isNotBlank()) { "Nhập tên vật tư" }
+        require(giaNhapTB >= 0) { "Giá vốn phải >= 0" }
+        val vt = db.vatTuDao().theoId(vatTuId) ?: error("Không tìm thấy vật tư")
+        db.vatTuDao().sua(
+            vt.copy(ten = ten.trim(), donVi = donVi.ifBlank { vt.donVi }, tonToiThieu = tonToiThieu.coerceAtLeast(0.0), giaNhapTB = giaNhapTB)
+        )
+    }
+
+    /** Xóa vật tư (chỉ khi chưa phát sinh nhập/xuất). */
+    suspend fun xoaVatTu(vatTuId: String) {
+        val lichSu = db.nhapKhoDao().theoVatTu(vatTuId)
+        // Flow — lấy 1 lần để kiểm tra
+        val coNhap = try { lichSu.first().isNotEmpty() } catch (_: Exception) { false }
+        if (coNhap) error("Vật tư đã có phiếu nhập — không xóa để giữ lịch sử")
+        db.vatTuDao().xoa(vatTuId)
     }
 }

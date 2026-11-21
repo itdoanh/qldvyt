@@ -87,4 +87,62 @@ class LuongRepository @Inject constructor(
         val cu = db.bangLuongDao().theoNvKy(nhanVienId, thang, nam) ?: error("Chưa có bảng lương")
         db.bangLuongDao().luu(cu.copy(trangThai = "NHAP", ngayChot = null))
     }
+
+    // ===== Sửa tạm ứng / thưởng-phạt từng NV trong tháng =====
+    fun tamUngKy(nvId: String, thang: Int, nam: Int): kotlinx.coroutines.flow.Flow<List<vn.rinso.qldvyt.data.local.TamUng>> {
+        val (tu, den) = dauCuoiThang(thang, nam)
+        return db.tamUngDao().theoKy(nvId, tu, den)
+    }
+
+    fun thuongPhatKy(nvId: String, thang: Int, nam: Int): kotlinx.coroutines.flow.Flow<List<vn.rinso.qldvyt.data.local.ThuongPhat>> {
+        val (tu, den) = dauCuoiThang(thang, nam)
+        return db.thuongPhatDao().theoKy(nvId, tu, den)
+    }
+
+    suspend fun themTamUng(nvId: String, soTien: Long, lyDo: String, thang: Int, nam: Int) {
+        require(soTien > 0) { "Tạm ứng phải > 0" }
+        db.tamUngDao().them(
+            vn.rinso.qldvyt.data.local.TamUng(
+                id = UUID.randomUUID().toString(), nhanVienId = nvId,
+                ngay = System.currentTimeMillis(), soTien = soTien, lyDo = lyDo.ifBlank { "Tạm ứng" },
+            )
+        )
+        // Tính lại nháp nếu chưa chốt
+        val cu = db.bangLuongDao().theoNvKy(nvId, thang, nam)
+        if (cu == null || cu.trangThai != "CHOT") {
+            val moi = tinhChoNv(nvId, thang, nam)
+            db.bangLuongDao().luu(moi.copy(trangThai = "NHAP"))
+        }
+    }
+
+    suspend fun themThuongPhat(nvId: String, loai: String, soTien: Long, lyDo: String, thang: Int, nam: Int) {
+        require(soTien != 0L) { "Số tiền phải khác 0" }
+        db.thuongPhatDao().them(
+            vn.rinso.qldvyt.data.local.ThuongPhat(
+                id = UUID.randomUUID().toString(), nhanVienId = nvId,
+                ngay = System.currentTimeMillis(), loai = loai, soTien = soTien, lyDo = lyDo.ifBlank { loai },
+            )
+        )
+        val cu = db.bangLuongDao().theoNvKy(nvId, thang, nam)
+        if (cu == null || cu.trangThai != "CHOT") {
+            val moi = tinhChoNv(nvId, thang, nam)
+            db.bangLuongDao().luu(moi.copy(trangThai = "NHAP"))
+        }
+    }
+
+    suspend fun xoaTamUng(id: String, nvId: String, thang: Int, nam: Int) {
+        db.tamUngDao().xoa(id)
+        val cu = db.bangLuongDao().theoNvKy(nvId, thang, nam)
+        if (cu != null && cu.trangThai != "CHOT") {
+            db.bangLuongDao().luu(tinhChoNv(nvId, thang, nam))
+        }
+    }
+
+    suspend fun xoaThuongPhat(id: String, nvId: String, thang: Int, nam: Int) {
+        db.thuongPhatDao().xoa(id)
+        val cu = db.bangLuongDao().theoNvKy(nvId, thang, nam)
+        if (cu != null && cu.trangThai != "CHOT") {
+            db.bangLuongDao().luu(tinhChoNv(nvId, thang, nam))
+        }
+    }
 }

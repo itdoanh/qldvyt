@@ -74,4 +74,26 @@ class NhiemVuRepository @Inject constructor(private val db: QldvytDatabase) {
         val nv = tim(id)
         db.nhiemVuDao().sua(nv.copy(trangThai = "HUY", tienNvHuong = 0L))
     }
+
+    /** Sửa nhiệm vụ: tên / NV phụ trách / tổng giá / tỷ lệ hưởng (tính lại tiền NV nếu đã xong). */
+    suspend fun suaViec(id: String, tenMoi: String, nhanVienIdMoi: String, tongGiaMoi: Long, tyLeMoi: Double) {
+        require(tenMoi.isNotBlank()) { "Nhập tên công việc" }
+        require(tongGiaMoi >= 0) { "Tổng giá phải >= 0" }
+        val cu = tim(id)
+        val tyLe = tyLeMoi.coerceIn(0.0, 1.0)
+        val tienMoi = if (cu.trangThai == "HOANTHANH") TinhTien.tienNvHuong(tongGiaMoi, tyLe, true) else 0L
+        db.nhiemVuDao().sua(
+            cu.copy(
+                tenCongViec = tenMoi.trim(), nhanVienId = nhanVienIdMoi.ifBlank { cu.nhanVienId },
+                tongGia = tongGiaMoi, tyLeHuong = tyLe, tienNvHuong = tienMoi,
+            )
+        )
+    }
+
+    /** Xóa nhiệm vụ (chỉ khi chưa hoàn thành để giữ tiền lương đúng). */
+    suspend fun xoaViec(id: String) {
+        val cu = tim(id)
+        if (cu.trangThai == "HOANTHANH") error("Việc đã hoàn thành — hãy Hủy thay vì xóa để giữ lịch sử lương")
+        db.nhiemVuDao().xoa(id)
+    }
 }

@@ -136,8 +136,7 @@ class DonHangRepository @Inject constructor(
         return donId
     }
 
-    /** Thu tiền 1 đơn (cho phép thu nhiều lần). Tự recompute daThu/conNo. */
-    suspend fun thuTien(
+    /** Thu tiền 1 đơn (cho phép thu nhiều lần). Tự recompute daThu/conNo. */    suspend fun thuTien(
         donHangId: String,
         soTien: Long,
         phuongThuc: String = "TIENMAT",
@@ -165,6 +164,72 @@ class DonHangRepository @Inject constructor(
         db.withTransaction {
             val don = db.donHangDao().theoId(donHangId) ?: error("Không tìm thấy đơn")
             db.donHangDao().sua(don.copy(trangThai = trangThai))
+        }
+    }
+
+    /** Tạo đơn cho khách vãng lai: chỉ cần ghi tên (+SĐT), app tự tạo hồ sơ KH vãng lai. */
+    suspend fun taoDonKhachVangLai(
+        tenKhach: String,
+        sdt: String = "",
+        matHang: List<MatHangMoi>,
+        giamGia: Long = 0L,
+        vatTuDung: List<VatTuDungMoi> = emptyList(),
+        ngayHen: Long? = null,
+        ghiChu: String = "",
+    ): String {
+        require(tenKhach.isNotBlank()) { "Nhập tên khách vãng lai" }
+        require(matHang.isNotEmpty()) { "Đơn hàng phải có ít nhất 1 dịch vụ/gói" }
+        val maKh = "KVL" + (System.currentTimeMillis() % 100000)
+        val khId = UUID.randomUUID().toString()
+        db.khachHangDao().them(
+            vn.rinso.qldvyt.data.local.KhachHang(
+                id = khId, maKh = maKh,
+                hoTen = tenKhach.trim() + " (vãng lai)",
+                sdt = sdt.trim(), diaChi = "",
+                ghiChu = "Khách vãng lai — tạo nhanh lúc bán",
+            )
+        )
+        return taoDonHang(khId, matHang, giamGia, vatTuDung, ngayHen, ghiChu)
+    }
+
+    /** Sửa đơn: giảm giá / ghi chú / ngày hẹn — tự tính lại VAT + còn nợ. */
+    suspend fun suaDon(donHangId: String, giamGiaMoi: Long, ghiChuMoi: String, ngayHenMoi: Long?) {
+        require(giamGiaMoi >= 0) { "Giảm giá phải >= 0" }
+        db.withTransaction {
+            val don = db.donHangDao().theoId(donHangId) ?: error("Không tìm thấy đơn")
+            val matHang = db.donHangChiTietDao().theoDon(donHangId)
+            val tongTienHang = matHang.sumOf { it.thanhTien }
+            val truocVat = TinhTien.tienTruocVat(tongTienHang, giamGiaMoi)
+            val batVat = don.tyLeVat > 0
+            val tienVat = if (!batVat) 0L else if (matHang.any { !it.chiuThue }) {
+                // Tính theo dòng chịu thuế, giảm giá phân bổ đều
+                val chiTietThue = matHang.map { ct ->
+                    val tyTrong = if (tongTienHang > 0) ct.thanhTien.toDouble() / tongTienHang else 0.0
+                    val giamChoDong = (maxOf(0L, giamGiaMoi) * tyTrong).toLong()
+                    (maxOf(0L, ct.thanhTien - giamChoDong)) to ct.chiuThue
+                }
+                TinhTien.tienVatTheoDong(chiTietThue, don.tyLeVat, true)
+            } else {
+                TinhTien.tienVatDon(truocVat, don.tyLeVat, true)
+            }
+            val tongMoi = TinhTien.tongThanhToanCoVat(truocVat, tienVat)
+            db.donHangDao().sua(
+                don.copy(
+                    giamGia = giamGiaMoi, tienVat = tienVat, tongThanhToan = tongMoi,
+                    conNo = TinhTien.conNo(tongMoi, don.daThu),
+                    ghiChu = ghiChuMoi.trim(), ngayHen = ngayHenMoi,
+                )
+            )
+        }
+    }
+
+    /** Xóa 1 dòng thu tiền (điều chỉnh công nợ) — tự tính lại đã thu / còn nợ. */
+    suspend fun xoaThanhToan(thanhToanId: String, donHangId: String) {
+        db.withTransaction {
+            db.thanhToanDao().xoa(thanhToanId)
+            val don = db.donHangDao().theoId(donHangId) ?: error("Không tìm thấy đơn")
+            val daThu = db.thanhToanDao().daThu(donHangId)
+            db.donHangDao().sua(don.copy(daThu = daThu, conNo = TinhTien.conNo(don.tongThanhToan, daThu)))
         }
     }
 

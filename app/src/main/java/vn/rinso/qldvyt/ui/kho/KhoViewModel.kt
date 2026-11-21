@@ -31,4 +31,18 @@ class KhoViewModel @Inject constructor(private val repo: KhoRepository) : ViewMo
             thongBao.value = "Đã nhập kho"
         }.onFailure { thongBao.value = it.message ?: "Nhập kho thất bại" }
     }
+
+    fun suaVatTu(vatTuId: String, ten: String, donVi: String, tonToiThieu: Double, giaVon: Long) = viewModelScope.launch {
+        runCatching {
+            repo.suaVatTu(vatTuId, ten, donVi, tonToiThieu, giaVon)
+            thongBao.value = "Đã cập nhật vật tư"
+        }.onFailure { thongBao.value = it.message ?: "Sửa thất bại" }
+    }
+
+    fun xoaVatTu(vatTuId: String) = viewModelScope.launch {
+        runCatching {
+            repo.xoaVatTu(vatTuId)
+            thongBao.value = "Đã xóa vật tư"
+        }.onFailure { thongBao.value = it.message ?: "Xóa thất bại" }
+    }
 }

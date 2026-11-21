@@ -57,6 +57,11 @@ fun ManHinhKhachHang(
     var oTen by remember { mutableStateOf("") }
     var oSdt by remember { mutableStateOf("") }
     var oDiaChi by remember { mutableStateOf("") }
+    var suaId by remember { mutableStateOf<String?>(null) }
+    var sTen by remember { mutableStateOf("") }
+    var sSdt by remember { mutableStateOf("") }
+    var sDiaChi by remember { mutableStateOf("") }
+    var sGhiChu by remember { mutableStateOf("") }
     val ctx = LocalContext.current
 
     val noTheoKh = dsDon.filter { it.conNo > 0 && it.trangThai != "HUY" }.groupBy { it.khachHangId }
@@ -117,7 +122,31 @@ fun ManHinhKhachHang(
                                 if (kh.diaChi.isNotEmpty()) Text(kh.diaChi, style = MaterialTheme.typography.bodySmall)
                                 Text("${dons.size} đơn - Đã chi: ${dinhDangTien(chi)}" + if (no > 0) " - Nợ: ${dinhDangTien(no)}" else " - Không nợ", style = MaterialTheme.typography.bodySmall, color = if (no > 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
                                 if (kh.ghiChu.isNotEmpty()) Text(kh.ghiChu, style = MaterialTheme.typography.bodySmall)
-                                OutlinedButton(onClick = { onChon(kh.id) }) { Text("Tạo đơn cho khách này") }
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    OutlinedButton(onClick = { onChon(kh.id) }) { Text("Tạo đơn") }
+                                    OutlinedButton(onClick = {
+                                        if (suaId == kh.id) suaId = null
+                                        else {
+                                            suaId = kh.id
+                                            sTen = kh.hoTen; sSdt = kh.sdt; sDiaChi = kh.diaChi; sGhiChu = kh.ghiChu
+                                        }
+                                    }) { Text(if (suaId == kh.id) "Đóng" else "Sửa") }
+                                    OutlinedButton(onClick = { vm.xoa(kh) }) { Text("Xóa") }
+                                }
+                                if (suaId == kh.id) {
+                                    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
+                                        Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                            OutlinedTextField(sTen, { sTen = it }, label = { Text("Họ tên (*)") }, modifier = Modifier.fillMaxWidth())
+                                            OutlinedTextField(sSdt, { sSdt = it.filter(Char::isDigit) }, label = { Text("SĐT") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                                            OutlinedTextField(sDiaChi, { sDiaChi = it }, label = { Text("Địa chỉ") }, modifier = Modifier.fillMaxWidth())
+                                            OutlinedTextField(sGhiChu, { sGhiChu = it }, label = { Text("Ghi chú") }, modifier = Modifier.fillMaxWidth())
+                                            Button(onClick = {
+                                                vm.sua(kh, sTen, sSdt, sDiaChi, sGhiChu)
+                                                suaId = null
+                                            }, modifier = Modifier.fillMaxWidth()) { Text("Lưu thay đổi") }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }

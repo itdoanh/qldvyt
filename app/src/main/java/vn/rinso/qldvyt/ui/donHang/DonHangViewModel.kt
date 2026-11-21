@@ -61,6 +61,34 @@ class DonHangViewModel @Inject constructor(
         }.onFailure { thongBao.value = it.message ?: "Tạo đơn thất bại" }
     }
 
+    /** Tạo đơn khách vãng lai: chỉ cần tên (+SĐT), không cần tạo hồ sơ trước. */
+    fun taoDonVangLai(tenKhach: String, sdt: String, onXong: (String) -> Unit) = viewModelScope.launch {
+        runCatching {
+            val mh = matHangDaChon.value
+            require(mh.isNotEmpty()) { "Hãy chọn ít nhất 1 dịch vụ (bước 2)" }
+            val id = repo.taoDonKhachVangLai(tenKhach, sdt, mh, giamGia.value, vatTuDaChon.value)
+            matHangDaChon.value = emptyList(); vatTuDaChon.value = emptyList(); giamGia.value = 0L
+            thongBao.value = "Đã tạo đơn cho khách vãng lai $tenKhach"
+            onXong(id)
+        }.onFailure { thongBao.value = it.message ?: "Tạo đơn thất bại" }
+    }
+
+    /** Sửa đơn: giảm giá / ghi chú / ngày hẹn (tự tính lại VAT + còn nợ). */
+    fun suaDon(donId: String, giamMoi: Long, ghiChuMoi: String, ngayHenMoi: Long?) = viewModelScope.launch {
+        runCatching {
+            repo.suaDon(donId, giamMoi, ghiChuMoi, ngayHenMoi)
+            thongBao.value = "Đã cập nhật đơn (tiền tự tính lại)"
+        }.onFailure { thongBao.value = it.message ?: "Sửa đơn thất bại" }
+    }
+
+    /** Xóa 1 dòng thu tiền để điều chỉnh công nợ. */
+    fun xoaThanhToan(ttId: String, donId: String) = viewModelScope.launch {
+        runCatching {
+            repo.xoaThanhToan(ttId, donId)
+            thongBao.value = "Đã xóa dòng thu (công nợ tự tính lại)"
+        }.onFailure { thongBao.value = it.message ?: "Xóa thất bại" }
+    }
+
     fun thuTien(donId: String, soTien: Long, phuongThuc: String) = viewModelScope.launch {
         runCatching {
             repo.thuTien(donId, soTien, phuongThuc)
