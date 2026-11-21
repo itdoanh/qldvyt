@@ -179,16 +179,40 @@ class DonHangRepository @Inject constructor(
     ): String {
         require(tenKhach.isNotBlank()) { "Nhập tên khách vãng lai" }
         require(matHang.isNotEmpty()) { "Đơn hàng phải có ít nhất 1 dịch vụ/gói" }
-        val maKh = "KVL" + (System.currentTimeMillis() % 100000)
-        val khId = UUID.randomUUID().toString()
-        db.khachHangDao().them(
-            vn.rinso.qldvyt.data.local.KhachHang(
-                id = khId, maKh = maKh,
-                hoTen = tenKhach.trim() + " (vãng lai)",
-                sdt = sdt.trim(), diaChi = "",
-                ghiChu = "Khách vãng lai — tạo nhanh lúc bán",
-            )
-        )
+        val sdtTrim = sdt.trim()
+        // Nếu SĐT đã có trong danh bạ thì dùng lại KH đó (tránh lỗi UNIQUE sdt).
+        if (sdtTrim.isNotEmpty()) {
+            val tonTai = try { db.khachHangDao().theoSdt(sdtTrim) } catch (_: Exception) { null }
+            if (tonTai != null) return taoDonHang(tonTai.id, matHang, giamGia, vatTuDung, ngayHen, ghiChu)
+        }
+        // Tạo KH vãng lai mới — chỉ thử tạo KH trong vòng lặp, tạo đơn ở ngoài
+        // để lỗi tồn kho không đẻ thêm KH rác.
+        var khId = ""
+        var lan = 0
+        var loiCuoi: Exception? = null
+        while (lan < 3) {
+            lan++
+            val maKh = "KVL" + (System.currentTimeMillis() % 100000) + (if (lan > 1) "-$lan" else "")
+            val sdtMoi = if (sdtTrim.isEmpty()) {
+                "09" + (System.currentTimeMillis() % 100000000L).toString().padStart(8, '0') + (if (lan > 1) "$lan" else "")
+            } else if (lan == 1) sdtTrim else sdtTrim.take(9) + lan.toString()
+            khId = UUID.randomUUID().toString()
+            try {
+                db.khachHangDao().them(
+                    vn.rinso.qldvyt.data.local.KhachHang(
+                        id = khId, maKh = maKh,
+                        hoTen = tenKhach.trim() + " (vãng lai)",
+                        sdt = sdtMoi, diaChi = "",
+                        ghiChu = "Khách vãng lai — tạo nhanh lúc bán",
+                    )
+                )
+                loiCuoi = null
+                break
+            } catch (e: Exception) {
+                loiCuoi = e // trùng mã/SĐT (UNIQUE) thì thử lại với hậu tố khác
+            }
+        }
+        if (loiCuoi != null) error("Không tạo được khách vãng lai (trùng SĐT?) — hãy nhập SĐT khác")
         return taoDonHang(khId, matHang, giamGia, vatTuDung, ngayHen, ghiChu)
     }
 
@@ -220,6 +244,74 @@ class DonHangRepository @Inject constructor(
                     ghiChu = ghiChuMoi.trim(), ngayHen = ngayHenMoi,
                 )
             )
+        }
+    }
+
+    /** Tính lại tiền đơn sau khi thêm/sửa/xóa dòng dịch vụ. */
+    private suspend fun tinhLaiTienDon(donHangId: String) {
+        val don = db.donHangDao().theoId(donHangId) ?: error("Không tìm thấy đơn")
+        val matHang = db.donHangChiTietDao().theoDon(donHangId)
+        val tongTienHang = matHang.sumOf { it.thanhTien }
+        // Giữ nguyên giảm giá cũ (kẹp không vượt tổng hàng)
+        val giam = don.giamGia.coerceIn(0L, tongTienHang)
+        val truocVat = TinhTien.tienTruocVat(tongTienHang, giam)
+        val batVat = don.tyLeVat > 0
+        val tienVat = if (!batVat || matHang.isEmpty()) 0L else if (matHang.any { !it.chiuThue }) {
+            val chiTietThue = matHang.map { ct ->
+                val tyTrong = if (tongTienHang > 0) ct.thanhTien.toDouble() / tongTienHang else 0.0
+                val giamChoDong = (giam * tyTrong).toLong()
+                (maxOf(0L, ct.thanhTien - giamChoDong)) to ct.chiuThue
+            }
+            TinhTien.tienVatTheoDong(chiTietThue, don.tyLeVat, true)
+        } else {
+            TinhTien.tienVatDon(truocVat, don.tyLeVat, true)
+        }
+        val tongMoi = TinhTien.tongThanhToanCoVat(truocVat, tienVat)
+        db.donHangDao().sua(
+            don.copy(
+                tongTienHang = tongTienHang, giamGia = giam, tienVat = tienVat,
+                tongThanhToan = tongMoi, conNo = TinhTien.conNo(tongMoi, don.daThu),
+            )
+        )
+    }
+
+    /** Thêm 1 dịch vụ/gói vào đơn đã có (cho phép sửa đơn: thêm món). */
+    suspend fun themDichVuVaoDon(donHangId: String, m: MatHangMoi) {
+        require(m.soLuong > 0) { "Số lượng phải > 0" }
+        db.withTransaction {
+            db.donHangDao().theoId(donHangId) ?: error("Không tìm thấy đơn")
+            val thanhTien = (m.soLuong * m.donGia).toLong()
+            db.donHangChiTietDao().them(
+                DonHangChiTiet(
+                    id = UUID.randomUUID().toString(), donHangId = donHangId,
+                    dichVuId = m.dichVuId, goiId = m.goiId,
+                    tenHienThi = m.tenHienThi, soLuong = m.soLuong,
+                    donGia = m.donGia, thanhTien = thanhTien, chiuThue = m.chiuThue,
+                )
+            )
+            tinhLaiTienDon(donHangId)
+        }
+    }
+
+    /** Sửa số lượng 1 dòng dịch vụ trong đơn. */
+    suspend fun suaSoLuongChiTiet(chiTietId: String, donHangId: String, soLuongMoi: Double) {
+        require(soLuongMoi > 0) { "Số lượng phải > 0" }
+        db.withTransaction {
+            val ds = db.donHangChiTietDao().theoDon(donHangId)
+            val ct = ds.firstOrNull { it.id == chiTietId } ?: error("Không tìm thấy dòng hàng")
+            val thanhMoi = (soLuongMoi * ct.donGia).toLong()
+            db.donHangChiTietDao().sua(ct.copy(soLuong = soLuongMoi, thanhTien = thanhMoi))
+            tinhLaiTienDon(donHangId)
+        }
+    }
+
+    /** Xóa 1 dòng dịch vụ khỏi đơn (giữ ít nhất 1 dòng). */
+    suspend fun xoaChiTiet(chiTietId: String, donHangId: String) {
+        db.withTransaction {
+            val ds = db.donHangChiTietDao().theoDon(donHangId)
+            require(ds.size > 1) { "Đơn phải giữ ít nhất 1 dịch vụ" }
+            db.donHangChiTietDao().xoa(chiTietId)
+            tinhLaiTienDon(donHangId)
         }
     }
 

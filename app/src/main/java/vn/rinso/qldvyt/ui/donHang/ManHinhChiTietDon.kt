@@ -20,6 +20,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -42,8 +43,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import vn.rinso.qldvyt.data.repo.DonHangRepository
+import vn.rinso.qldvyt.data.repo.MatHangMoi
 import vn.rinso.qldvyt.ui.common.HangTienTrinh
 import vn.rinso.qldvyt.ui.common.NhanTrangThai
 import vn.rinso.qldvyt.ui.common.mauTrangThaiDon
@@ -55,7 +59,13 @@ class ChiTietDonViewModel @Inject constructor(
     private val khDao: KhachHangDao,
     private val pdf: vn.rinso.qldvyt.data.pdf.PdfExporter,
     private val caiDat: vn.rinso.qldvyt.data.prefs.CaiDat,
+    dichVuDao: vn.rinso.qldvyt.data.local.DichVuDao,
+    goiDao: vn.rinso.qldvyt.data.local.GoiDichVuDao,
 ) : ViewModel() {
+    val dsDichVu = dichVuDao.dangBan()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val dsGoi = goiDao.dangBan()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     var don by mutableStateOf<DonHang?>(null)
         private set
     var chiTiet by mutableStateOf<List<DonHangChiTiet>>(emptyList())
@@ -105,6 +115,43 @@ class ChiTietDonViewModel @Inject constructor(
             tb = "Đã cập nhật đơn (tiền tự tính lại)"
             tai(id)
         }.onFailure { tb = it.message ?: "Sửa thất bại" }
+    }
+
+    /** Đơn đã có: thêm 1 dịch vụ/gói (tiền tự tính lại). */
+    fun themDichVuVaoDon(dichVuId: String?, goiId: String?) = viewModelScope.launch {
+        runCatching {
+            val id = don?.id ?: return@launch
+            val m = if (dichVuId != null) {
+                val dv = dsDichVu.value.firstOrNull { it.id == dichVuId } ?: error("Không tìm thấy dịch vụ")
+                MatHangMoi(dichVuId = dv.id, tenHienThi = dv.ten, soLuong = 1.0, donGia = dv.giaNiemYet, chiuThue = dv.chiuThue)
+            } else {
+                val goi = dsGoi.value.firstOrNull { it.id == goiId } ?: error("Không tìm thấy gói")
+                MatHangMoi(goiId = goi.id, tenHienThi = goi.ten, soLuong = 1.0, donGia = goi.giaGoi)
+            }
+            repo.themDichVuVaoDon(id, m)
+            tb = "Đã thêm ${m.tenHienThi} (tiền tự tính lại)"
+            tai(id)
+        }.onFailure { tb = it.message ?: "Thêm thất bại" }
+    }
+
+    /** Sửa số lượng 1 dòng dịch vụ trong đơn. */
+    fun doiSoLuong(ctId: String, delta: Double) = viewModelScope.launch {
+        runCatching {
+            val id = don?.id ?: return@launch
+            val ct = chiTiet.firstOrNull { it.id == ctId } ?: return@launch
+            repo.suaSoLuongChiTiet(ctId, id, maxOf(1.0, ct.soLuong + delta))
+            tai(id)
+        }.onFailure { tb = it.message ?: "Sửa SL thất bại" }
+    }
+
+    /** Xóa 1 dòng dịch vụ khỏi đơn. */
+    fun xoaDichVu(ctId: String) = viewModelScope.launch {
+        runCatching {
+            val id = don?.id ?: return@launch
+            repo.xoaChiTiet(ctId, id)
+            tb = "Đã xóa dòng dịch vụ (tiền tự tính lại)"
+            tai(id)
+        }.onFailure { tb = it.message ?: "Xóa thất bại" }
     }
 
     /** Xóa 1 dòng thu tiền để điều chỉnh công nợ. */
@@ -189,19 +236,62 @@ fun ManHinhChiTietDon(donId: String, vm: ChiTietDonViewModel = hiltViewModel()) 
                 Button(onClick = { chonPdf.launch("hoa-don-${don.maDh}.pdf") }, modifier = Modifier.fillMaxWidth()) { Text("Xuất hóa đơn PDF (có VAT)") }
             }
         }
-        Text("Mặt hàng (giá snapshot chống trượt giá):", fontWeight = FontWeight.Bold)
+        Text("Mặt hàng — thêm / sửa số lượng / xóa dịch vụ:", fontWeight = FontWeight.Bold)
+        val dsDv by vm.dsDichVu.collectAsState()
+        val dsGoi by vm.dsGoi.collectAsState()
+        var moThemDv by remember(don.id) { mutableStateOf(false) }
+        var tkThem by remember(don.id) { mutableStateOf("") }
         vm.chiTiet.forEach { ct ->
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest)) {
-                Row(Modifier.padding(12.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Column(Modifier.weight(1f)) {
-                        Text("${ct.tenHienThi} x ${ct.soLuong.toInt()}", fontWeight = FontWeight.SemiBold)
-                        Text(if (ct.chiuThue) "Chịu VAT" else "Không chịu VAT", style = MaterialTheme.typography.bodySmall)
+                Column(Modifier.padding(12.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Column(Modifier.weight(1f)) {
+                            Text("${ct.tenHienThi} x ${ct.soLuong.toInt()}", fontWeight = FontWeight.SemiBold)
+                            Text("${dinhDangTien(ct.donGia)}/lần • ${if (ct.chiuThue) "Chịu VAT" else "Không chịu VAT"}", style = MaterialTheme.typography.bodySmall)
+                        }
+                        Text(dinhDangTien(ct.thanhTien), fontWeight = FontWeight.Bold)
                     }
-                    Text(dinhDangTien(ct.thanhTien), fontWeight = FontWeight.Bold)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = { vm.doiSoLuong(ct.id, -1.0) }) { Text("−") }
+                        OutlinedButton(onClick = { vm.doiSoLuong(ct.id, 1.0) }) { Text("+") }
+                        OutlinedButton(onClick = { vm.xoaDichVu(ct.id) }) { Text("Xóa món") }
+                    }
                 }
             }
         }
         if (vm.chiTiet.isEmpty()) Text("Đơn chưa có mặt hàng.", style = MaterialTheme.typography.bodySmall)
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
+            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("Thêm dịch vụ / gói vào đơn:", fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                    OutlinedButton(onClick = { moThemDv = !moThemDv }) { Text(if (moThemDv) "Đóng" else "+ Thêm món") }
+                }
+                if (moThemDv) {
+                    OutlinedTextField(tkThem, { tkThem = it }, label = { Text("Tìm dịch vụ / gói...") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                    val locDv = dsDv.filter { tkThem.isBlank() || it.ten.contains(tkThem.trim(), true) }.take(8)
+                    val locGoi = dsGoi.filter { tkThem.isBlank() || it.ten.contains(tkThem.trim(), true) }.take(8)
+                    locDv.forEach { dv ->
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Column(Modifier.weight(1f)) {
+                                Text(dv.ten, fontWeight = FontWeight.SemiBold)
+                                Text(dinhDangTien(dv.giaNiemYet), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                            }
+                            OutlinedButton(onClick = { vm.themDichVuVaoDon(dv.id, null) }) { Text("+ Thêm") }
+                        }
+                    }
+                    locGoi.forEach { goi ->
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Column(Modifier.weight(1f)) {
+                                Text(goi.ten + " (GÓI)", fontWeight = FontWeight.SemiBold)
+                                Text(dinhDangTien(goi.giaGoi), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                            }
+                            OutlinedButton(onClick = { vm.themDichVuVaoDon(null, goi.id) }) { Text("+ Thêm") }
+                        }
+                    }
+                    if (locDv.isEmpty() && locGoi.isEmpty()) Text("Không tìm thấy dịch vụ / gói.", style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        }
         if (don.conNo > 0 && don.trangThai != "HUY") {
             Card {
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

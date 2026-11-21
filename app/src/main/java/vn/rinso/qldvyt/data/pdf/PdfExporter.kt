@@ -47,6 +47,24 @@ class PdfExporter @Inject constructor(@ApplicationContext private val ctx: Conte
             isAntiAlias = true
         }
 
+    /** Cắt ngắn chữ cho vừa khung để không tràn/chồng lấn (PDF không tự wrap). */
+    private fun vuaKhung(s: String, p: Paint, maxRong: Float): String {
+        var t = s.trim()
+        if (p.measureText(t) <= maxRong) return t
+        while (t.length > 4 && p.measureText("$t…") > maxRong) t = t.dropLast(1)
+        return "$t…"
+    }
+
+    private fun veTrai(c: android.graphics.Canvas, s: String, x: Float, y: Float, p: Paint, maxRong: Float) {
+        c.drawText(vuaKhung(s, p, maxRong), x, y, p)
+    }
+
+    /** Vẽ tiền căn phải trong ô [xTrai, xPhai]. */
+    private fun vePhai(c: android.graphics.Canvas, s: String, xTrai: Float, xPhai: Float, y: Float, p: Paint) {
+        val t = vuaKhung(s, p, xPhai - xTrai - 6f)
+        c.drawText(t, xPhai - p.measureText(t) - 6f, y, p)
+    }
+
     private fun veTrang(
         doc: PdfDocument, tieuDe: String, cty: ThongTinCongTy,
         dong: List<String>, dongDam: Set<Int> = emptySet(),
@@ -184,13 +202,15 @@ class PdfExporter @Inject constructor(@ApplicationContext private val ctx: Conte
         c.drawLine(le, y + caoNV * 2 / 2.75f, phai, y + caoNV * 2 / 2.75f, vien)
         var ynv = y + 15f
         val giua = (le + phai) / 2 + 8f
-        c.drawText("Mã NV: ${nv.maNv}", le + 8f, ynv, pTbDam)
-        c.drawText("Họ và tên: ${nv.hoTen}", giua, ynv, pTbDam); ynv += 20f
-        c.drawText("Chức vụ: ${capTen.ifBlank { "—" }}", le + 8f, ynv, pTb)
-        c.drawText("SĐT: ${nv.sdt.ifBlank { "—" }}", giua, ynv, pTb); ynv += 20f
-        c.drawText("STK: ${nv.stk.ifBlank { "—" }}", le + 8f, ynv, pTb)
-        c.drawText("Tổng công: ${bl.tongCong} công", giua, ynv, pTb); ynv += 20f
-        c.drawText("Ngày vào làm: ${dinhDangNgay(nv.ngayVaoLam)}", le + 8f, ynv, pNho)
+        val rongTrai = (le + phai) / 2 - le - 14f
+        val rongPhai = phai - giua - 8f
+        veTrai(c, "Mã NV: ${nv.maNv}", le + 8f, ynv, pTbDam, rongTrai)
+        veTrai(c, "Họ và tên: ${nv.hoTen}", giua, ynv, pTbDam, rongPhai); ynv += 20f
+        veTrai(c, "Chức vụ: ${capTen.ifBlank { "—" }}", le + 8f, ynv, pTb, rongTrai)
+        veTrai(c, "SĐT: ${nv.sdt.ifBlank { "—" }}", giua, ynv, pTb, rongPhai); ynv += 20f
+        veTrai(c, "STK: ${nv.stk.ifBlank { "—" }}", le + 8f, ynv, pTb, rongTrai)
+        veTrai(c, "Tổng công: ${bl.tongCong} công", giua, ynv, pTb, rongPhai); ynv += 20f
+        veTrai(c, "Ngày vào làm: ${dinhDangNgay(nv.ngayVaoLam)}", le + 8f, ynv, pNho, rongTrai + rongPhai)
         y += caoNV + 14f
 
         // --- Bảng thu nhập / khấu trừ (2 khối) ---
@@ -212,23 +232,24 @@ class PdfExporter @Inject constructor(@ApplicationContext private val ctx: Conte
         fun veKhoi(tieuDe: String, hang: List<Pair<String, Long>>, tong: Long, tongNhan: String): Float {
             val caoHang = 21f; val caoHead = 24f
             val cao = caoHead + hang.size * caoHang + caoHang
+            val cotTienX = le + (phai - le) * 0.60f // đường chia cột tiền — mọi tiền căn phải sau vạch này
             // nền + viền
             c.drawRect(le, y, phai, y + cao, vien)
             c.drawRect(le, y, phai, y + caoHead, nenTieuDe)
             c.drawLine(le, y + caoHead, phai, y + caoHead, vien)
-            c.drawLine(le + 330f, y, le + 330f, y + cao, vien)
-            c.drawText(tieuDe, le + 10f, y + 16f, pTbDam)
-            c.drawText("Số tiền (VNĐ)", le + 340f, y + 16f, pTbDam)
+            c.drawLine(cotTienX, y, cotTienX, y + cao, vien)
+            veTrai(c, tieuDe, le + 10f, y + 16f, pTbDam, cotTienX - le - 14f)
+            vePhai(c, "Số tiền (VNĐ)", cotTienX, phai, y + 16f, pTbDam)
             var yy = y + caoHead + 15f
             hang.forEach { (ten, tien) ->
-                c.drawText(ten, le + 10f, yy, pTb)
-                c.drawText(dinhDangTien(tien), le + 340f, yy, pTien)
+                veTrai(c, ten, le + 10f, yy, pTb, cotTienX - le - 14f)
+                vePhai(c, dinhDangTien(tien), cotTienX, phai, yy, pTien)
                 c.drawLine(le, yy + 6f, phai, yy + 6f, Paint().apply { strokeWidth = 0.6f; color = 0xFFCFD8DC.toInt() })
                 yy += caoHang
             }
             c.drawRect(le, yy - 15f, phai, yy + 6f, Paint().apply { style = Paint.Style.FILL; color = 0xFFF5F5F5.toInt() })
-            c.drawText(tongNhan, le + 10f, yy, pTbDam)
-            c.drawText(dinhDangTien(tong), le + 340f, yy, pTienDam)
+            veTrai(c, tongNhan, le + 10f, yy, pTbDam, cotTienX - le - 14f)
+            vePhai(c, dinhDangTien(tong), cotTienX, phai, yy, pTienDam)
             return cao + 12f
         }
         y += veKhoi("A. CÁC KHOẢN THU NHẬP", hangTN, thuNhap, "Tổng thu nhập")
@@ -238,21 +259,35 @@ class PdfExporter @Inject constructor(@ApplicationContext private val ctx: Conte
         val caoTL = 44f
         c.drawRect(le, y, phai, y + caoTL, vienDam)
         c.drawRect(le, y, phai, y + caoTL, nenThucLinh)
-        c.drawText("C. THỰC LĨNH:", le + 10f, y + 27f, paint(den, 13f, true))
-        val sTL = dinhDangTien(bl.thucLinh)
-        c.drawText(sTL, phai - pThucLinh.measureText(sTL) - 10f, y + 28f, pThucLinh)
+        veTrai(c, "C. THỰC LĨNH:", le + 10f, y + 27f, paint(den, 13f, true), 200f)
+        vePhai(c, dinhDangTien(bl.thucLinh), le + 200f, phai, y + 28f, pThucLinh)
         y += caoTL + 8f
-        c.drawText("Bằng chữ: ${docTienBangChu(bl.thucLinh)}.", le, y, pNho); y += 18f
+        // Bằng chữ: tự xuống dòng nếu dài để không tràn lề
+        val bangChu = "Bằng chữ: ${docTienBangChu(bl.thucLinh)}."
+        if (pNho.measureText(bangChu) <= phai - le) {
+            veTrai(c, bangChu, le, y, pNho, phai - le); y += 18f
+        } else {
+            // cắt thành 2 dòng theo từ
+            val tu = bangChu.split(" "); var d1 = ""; var i = 0
+            while (i < tu.size && pNho.measureText((if (d1.isEmpty()) "" else "$d1 ") + tu[i]) <= phai - le) {
+                d1 = if (d1.isEmpty()) tu[i] else "$d1 ${tu[i]}"; i++
+            }
+            val d2 = tu.drop(i).joinToString(" ")
+            veTrai(c, d1, le, y, pNho, phai - le); y += 14f
+            if (d2.isNotEmpty()) { veTrai(c, d2, le, y, pNho, phai - le); y += 14f }
+            y += 4f
+        }
 
-        // --- Ký tên 3 bên ---
+        // --- Ký tên 3 bên (căn giữa từng cột, không chồng nhau) ---
         c.drawText("Xác nhận của các bên (ký, ghi rõ họ tên):", le, y, pTbDam); y += 18f
-        val c1 = le + 90f; val c2 = (le + phai) / 2; val c3 = phai - 90f
-        c.drawText("Người lập phiếu", c1 - 45f, y, pTb)
-        c.drawText("Kế toán", c2 - 25f, y, pTb)
-        c.drawText("Nhân viên", c3 - 30f, y, pTb); y += 52f
-        c.drawText("(Ký, họ tên)", c1 - 35f, y, pNho)
-        c.drawText("(Ký, họ tên)", c2 - 35f, y, pNho)
-        c.drawText("(Ký, họ tên)", c3 - 35f, y, pNho)
+        val cotKy = floatArrayOf(le + (phai - le) * 0.17f, le + (phai - le) * 0.50f, le + (phai - le) * 0.83f)
+        val nhanKy = listOf("Người lập phiếu", "Kế toán", "Nhân viên")
+        nhanKy.forEachIndexed { idx, s -> c.drawText(s, cotKy[idx] - pTb.measureText(s) / 2f, y, pTb) }
+        y += 52f
+        repeat(3) { idx ->
+            val s = "(Ký, họ tên)"
+            c.drawText(s, cotKy[idx] - pNho.measureText(s) / 2f, y, pNho)
+        }
         val stamp = SimpleDateFormat("dd/MM/yyyy HH:mm", VI).format(Date())
         c.drawText("In lúc $stamp — Rinso QLDVYT (offline) — Trang $soTrang", le, (h - 36).toFloat(), pCtyNho)
         doc.finishPage(page)
@@ -291,17 +326,17 @@ class PdfExporter @Inject constructor(@ApplicationContext private val ctx: Conte
         var y = 40f
         fun headerTrang(dau: Boolean) {
             if (!dau) { doc.finishPage(page); page = doc.startPage(PdfDocument.PageInfo.Builder(w, h, ++soTrang).create()); c = page.canvas; y = 40f }
-            c.drawText(cty.ten.uppercase(VI), le, y, pTenCty); y += 13f
-            c.drawText("Đ/c: ${cty.diaChi} • ĐT: ${cty.sdt}" + if (cty.maSoThue.isNotBlank()) " • MST: ${cty.maSoThue}" else "", le, y, pNho); y += 13f
-            c.drawText("BẢNG TỔNG HỢP THANH TOÁN LƯƠNG THÁNG $thang/$nam (${cacDong.size} nhân viên)", le, y, pTieuDe); y += 15f
-            c.drawText("Ngày in: ${SimpleDateFormat("dd/MM/yyyy HH:mm", VI).format(Date())}  •  Đơn vị tiền: VNĐ", le, y, pNho); y += 12f
+            veTrai(c, cty.ten.uppercase(VI), le, y, pTenCty, rong); y += 13f
+            veTrai(c, "Đ/c: ${cty.diaChi} • ĐT: ${cty.sdt}" + if (cty.maSoThue.isNotBlank()) " • MST: ${cty.maSoThue}" else "", le, y, pNho, rong); y += 13f
+            veTrai(c, "BẢNG LƯƠNG THÁNG $thang/$nam (${cacDong.size} NV)", le, y, pTieuDe, rong); y += 15f
+            veTrai(c, "Ngày in: ${SimpleDateFormat("dd/MM/yyyy HH:mm", VI).format(Date())}  •  ĐVT: VNĐ", le, y, pNho, rong); y += 12f
             // vẽ header bảng
             var x = le
             c.drawRect(le, y, phai, y + caoHead, nenHead)
             tieuDeCot.forEachIndexed { i, t ->
                 val parts = t.split("\n")
-                if (parts.size == 1) c.drawText(t, x + 3f, y + 19f, pHead)
-                else { c.drawText(parts[0], x + 3f, y + 12f, pHead); c.drawText(parts[1], x + 3f, y + 22f, pHead) }
+                if (parts.size == 1) veTrai(c, t, x + 3f, y + 19f, pHead, wCot[i] - 5f)
+                else { veTrai(c, parts[0], x + 3f, y + 12f, pHead, wCot[i] - 5f); veTrai(c, parts[1], x + 3f, y + 22f, pHead, wCot[i] - 5f) }
                 x += wCot[i]
                 c.drawLine(x, y, x, y + caoHead, Paint().apply { strokeWidth = 0.9f; color = 0xFFFFFFFF.toInt() })
             }
@@ -312,13 +347,13 @@ class PdfExporter @Inject constructor(@ApplicationContext private val ctx: Conte
         var stt = 0
         var tCong = 0.0; var tLcb = 0L; var tNv = 0L; var tThuong = 0L; var tCcPc = 0L; var tUng = 0L; var tPhat = 0L; var tTncn = 0L; var tTl = 0L
         cacDong.forEach { (nv, bl, _) ->
-            if (y + caoDong > h - 150) headerTrang(false)
+            if (y + caoDong > h - 160) headerTrang(false)
             stt += 1
             tCong += bl.tongCong; tLcb += bl.luongCoBan; tNv += bl.tienNhiemVu
             tThuong += bl.thuong + bl.hoaHong; tCcPc += bl.chuyenCan + bl.phuCap
             tUng += bl.tamUng; tPhat += bl.khauTruKhac; tTncn += bl.thueTncn; tTl += bl.thucLinh
             val o = listOf(
-                "$stt", nv.hoTen.take(18), "${bl.tongCong}",
+                "$stt", nv.hoTen.take(16), "${bl.tongCong}",
                 rutGon(bl.luongCoBan), rutGon(bl.tienNhiemVu), rutGon(bl.thuong + bl.hoaHong),
                 rutGon(bl.chuyenCan + bl.phuCap), rutGon(bl.tamUng), rutGon(bl.khauTruKhac),
                 rutGon(bl.thueTncn), rutGon(bl.thucLinh),
@@ -326,11 +361,8 @@ class PdfExporter @Inject constructor(@ApplicationContext private val ctx: Conte
             var x = le
             o.forEachIndexed { i, s ->
                 val p = if (i == 10) pODam else pO
-                // cột số căn phải, cột tên căn trái
-                if (i >= 2) {
-                    val wT = p.measureText(s)
-                    c.drawText(s, x + wCot[i] - wT - 3f, y + 13f, p)
-                } else c.drawText(s, x + 3f, y + 13f, p)
+                if (i <= 1) veTrai(c, s, x + 3f, y + 13f, p, wCot[i] - 5f)
+                else vePhai(c, s, x, x + wCot[i], y + 13f, p)
                 x += wCot[i]
             }
             // kẻ khung dòng
@@ -340,14 +372,13 @@ class PdfExporter @Inject constructor(@ApplicationContext private val ctx: Conte
             y += caoDong
         }
         // Dòng tổng cộng
-        if (y + caoDong > h - 140) headerTrang(false)
+        if (y + caoDong > h - 150) headerTrang(false)
         var x = le
         val oTong = listOf("Σ", "${cacDong.size} NV", "${"%.1f".format(tCong)}", rutGon(tLcb), rutGon(tNv), rutGon(tThuong), rutGon(tCcPc), rutGon(tUng), rutGon(tPhat), rutGon(tTncn), rutGon(tTl))
         c.drawRect(le, y, phai, y + caoDong + 4f, nenTong)
         oTong.forEachIndexed { i, s ->
-            val p = pTong
-            if (i >= 2) { val wT = p.measureText(s); c.drawText(s, x + wCot[i] - wT - 3f, y + 14f, p) }
-            else c.drawText(s, x + 3f, y + 14f, p)
+            if (i <= 1) veTrai(c, s, x + 3f, y + 14f, pTong, wCot[i] - 5f)
+            else vePhai(c, s, x, x + wCot[i], y + 14f, pTong)
             x += wCot[i]
         }
         var xx = le
@@ -355,21 +386,28 @@ class PdfExporter @Inject constructor(@ApplicationContext private val ctx: Conte
         wCot.forEach { wc -> xx += wc; c.drawLine(xx, y, xx, y + caoDong + 4f, vien) }
         y += caoDong + 16f
         // Khối tổng hợp chi tiết
-        if (y > h - 160) headerTrang(false)
-        c.drawText("TỔNG HỢP CHI TIẾT THÁNG $thang/$nam:", le, y, pODam); y += 15f
+        if (y > h - 170) headerTrang(false)
+        veTrai(c, "TỔNG HỢP CHI TIẾT THÁNG $thang/$nam:", le, y, pODam, rong); y += 15f
         val chiTiet = listOf(
             "Tổng quỹ lương thực lĩnh: ${dinhDangTien(tTl)}  (${cacDong.size} nhân viên)",
-            "Tổng lương theo công: ${dinhDangTien(tLcb)}  •  Tiền nhiệm vụ 30%: ${dinhDangTien(tNv)}",
-            "Thưởng + hoa hồng: ${dinhDangTien(tThuong)}  •  Chuyên cần + phụ cấp: ${dinhDangTien(tCcPc)}",
-            "Tổng tạm ứng: ${dinhDangTien(tUng)}  •  Phạt/khấu trừ: ${dinhDangTien(tPhat)}  •  Thuế TNCN: ${dinhDangTien(tTncn)}",
-            "Bình quân thực lĩnh: ${dinhDangTien(if (cacDong.isNotEmpty()) tTl / cacDong.size else 0L)}/NV  •  Tổng công: ${"%.1f".format(tCong)}",
+            "Tổng lương theo công: ${dinhDangTien(tLcb)}  •  NV 30%: ${dinhDangTien(tNv)}",
+            "Thưởng + HH: ${dinhDangTien(tThuong)}  •  CCần + PC: ${dinhDangTien(tCcPc)}",
+            "Tạm ứng: ${dinhDangTien(tUng)}  •  Phạt: ${dinhDangTien(tPhat)}  •  TNCN: ${dinhDangTien(tTncn)}",
+            "Bình quân: ${dinhDangTien(if (cacDong.isNotEmpty()) tTl / cacDong.size else 0L)}/NV  •  Tổng công: ${"%.1f".format(tCong)}",
         )
-        chiTiet.forEach { s -> c.drawText("• $s", le, y, pO); y += 14f }
+        chiTiet.forEach { s -> veTrai(c, "• $s", le, y, pO, rong); y += 14f }
         y += 10f
-        c.drawText("Người lập bảng          Kế toán trưởng          Giám đốc", le + 30f, y, pO); y += 44f
-        c.drawText("(Ký, họ tên)               (Ký, họ tên)               (Ký, đóng dấu)", le + 30f, y, pNho)
-        val stamp = SimpleDateFormat("dd/MM/yyyy HH:mm", VI).format(Date())
-        c.drawText("In lúc $stamp — Rinso QLDVYT (offline) — Trang $soTrang", le, (h - 30).toFloat(), pNho)
+        val cotKyT = floatArrayOf(le + rong * 0.17f, le + rong * 0.50f, le + rong * 0.83f)
+        listOf("Người lập bảng", "Kế toán trưởng", "Giám đốc").forEachIndexed { idx, s ->
+            c.drawText(s, cotKyT[idx] - pO.measureText(s) / 2f, y, pO)
+        }
+        y += 44f
+        repeat(3) { idx ->
+            val s = if (idx == 2) "(Ký, đóng dấu)" else "(Ký, họ tên)"
+            c.drawText(s, cotKyT[idx] - pNho.measureText(s) / 2f, y, pNho)
+        }
+        val stampTong = SimpleDateFormat("dd/MM/yyyy HH:mm", VI).format(Date())
+        veTrai(c, "In lúc $stampTong — Rinso QLDVYT (offline) — Trang $soTrang", le, (h - 30).toFloat(), pNho, rong)
         doc.finishPage(page)
         ghi(doc, uri)
     }

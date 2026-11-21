@@ -43,6 +43,8 @@ class DonHangViewModel @Inject constructor(
     val matHangDaChon = MutableStateFlow<List<MatHangMoi>>(emptyList())
     val vatTuDaChon = MutableStateFlow<List<VatTuDungMoi>>(emptyList())
     val giamGia = MutableStateFlow(0L)
+    /** Chặn bấm 2 lần + hiện "Đang tạo..." để không tưởng lỗi giao diện. */
+    val dangTao = MutableStateFlow(false)
 
     fun chonKhach(id: String) { khachDaChon.value = id }
     fun themMatHang(m: MatHangMoi) { matHangDaChon.value = matHangDaChon.value + m }
@@ -74,20 +76,26 @@ class DonHangViewModel @Inject constructor(
     }
 
     fun taoDon(onXong: (String) -> Unit) = viewModelScope.launch {
+        if (dangTao.value) return@launch
+        dangTao.value = true
         runCatching {
             val khId = khachDaChon.value ?: error("Hãy chọn khách hàng (bước 1)")
             val mh = matHangDaChon.value
             require(mh.isNotEmpty()) { "Hãy chọn ít nhất 1 dịch vụ (bước 2)" }
             val id = repo.taoDonHang(khId, mh, giamGia.value, vatTuDaChon.value)
-            matHangDaChon.value = emptyList(); vatTuDaChon.value = emptyList(); giamGia.value = 0L
+            matHangDaChon.value = emptyList(); vatTuDaChon.value = emptyList(); giamGia.value = 0L; khachDaChon.value = null
             thongBao.value = "Đã tạo đơn thành công"
             onXong(id)
         }.onFailure { thongBao.value = it.message ?: "Tạo đơn thất bại" }
+        dangTao.value = false
     }
 
     /** Tạo đơn khách vãng lai: chỉ cần tên (+SĐT), không cần tạo hồ sơ trước. */
     fun taoDonVangLai(tenKhach: String, sdt: String, onXong: (String) -> Unit) = viewModelScope.launch {
+        if (dangTao.value) return@launch
+        dangTao.value = true
         runCatching {
+            require(tenKhach.isNotBlank()) { "Nhập tên khách vãng lai (bước 1)" }
             val mh = matHangDaChon.value
             require(mh.isNotEmpty()) { "Hãy chọn ít nhất 1 dịch vụ (bước 2)" }
             val id = repo.taoDonKhachVangLai(tenKhach, sdt, mh, giamGia.value, vatTuDaChon.value)
@@ -95,6 +103,7 @@ class DonHangViewModel @Inject constructor(
             thongBao.value = "Đã tạo đơn cho khách vãng lai $tenKhach"
             onXong(id)
         }.onFailure { thongBao.value = it.message ?: "Tạo đơn thất bại" }
+        dangTao.value = false
     }
 
     /** Sửa đơn: giảm giá / ghi chú / ngày hẹn (tự tính lại VAT + còn nợ). */

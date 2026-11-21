@@ -163,7 +163,11 @@ fun QldvytNavGraph() {
                 )
             }
             composable(Tuyen.TAO_DON) {
-                ManHinhTaoDon(onXong = { nav.popBackStack(Tuyen.DON_HANG, false) })
+                ManHinhTaoDon(onXong = {
+                    // Đơn tạo từ Tổng quan hay Đơn hàng đều về được danh sách:
+                    // pop thường, nếu không còn gì để pop thì navigate về Đơn.
+                    if (!nav.popBackStack()) nav.navigate(Tuyen.DON_HANG)
+                })
             }
             composable(
                 route = Tuyen.CHI_TIET_DON,

@@ -131,6 +131,12 @@ interface DonHangChiTietDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun them(ct: DonHangChiTiet)
+
+    @Update
+    suspend fun sua(ct: DonHangChiTiet)
+
+    @Query("DELETE FROM don_hang_chi_tiet WHERE id = :id")
+    suspend fun xoa(id: String)
 }
 
 @Dao
@@ -140,6 +146,9 @@ interface DonHangVatTuDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun them(vt: DonHangVatTu)
+
+    @Query("DELETE FROM don_hang_vat_tu WHERE id = :id")
+    suspend fun xoa(id: String)
 }
 
 @Dao
@@ -219,6 +228,9 @@ interface KhachHangDao {
     @Query("SELECT * FROM khach_hang WHERE id = :id")
     suspend fun theoId(id: String): KhachHang?
 
+    @Query("SELECT * FROM khach_hang WHERE sdt = :sdt LIMIT 1")
+    suspend fun theoSdt(sdt: String): KhachHang?
+
     @Query("SELECT * FROM khach_hang WHERE sdt LIKE '%' || :tuKhoa || '%' OR hoTen LIKE '%' || :tuKhoa || '%' ORDER BY hoTen")
     fun timKiem(tuKhoa: String): Flow<List<KhachHang>>
 
@@ -257,6 +269,9 @@ interface DichVuDao {
 interface GoiDichVuDao {
     @Query("SELECT * FROM goi_dich_vu WHERE trangThai='DANGBAN' ORDER BY ten")
     fun dangBan(): Flow<List<GoiDichVu>>
+
+    @Query("SELECT * FROM goi_dich_vu WHERE id = :id")
+    suspend fun theoId(id: String): GoiDichVu?
 
     @Query("SELECT * FROM goi_dich_vu ORDER BY ten")
     fun tatCa(): Flow<List<GoiDichVu>>

@@ -58,6 +58,7 @@ fun ManHinhTaoDon(
     var tkKh by remember { mutableStateOf("") }
     var tkDv by remember { mutableStateOf("") }
     var tkVt by remember { mutableStateOf("") }
+    val dangTao by vm.dangTao.collectAsState()
     var laVangLai by remember { mutableStateOf(false) }
     var tenVangLai by remember { mutableStateOf("") }
     var sdtVangLai by remember { mutableStateOf("") }
@@ -249,17 +250,18 @@ fun ManHinhTaoDon(
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { buoc = 2 }, modifier = Modifier.weight(1f)) { Text("← Quay lại") }
+                OutlinedButton(onClick = { buoc = 2 }, modifier = Modifier.weight(1f), enabled = !dangTao) { Text("← Quay lại") }
                 Button(
                     onClick = {
                         vm.giamGia.value = giam
                         if (laVangLai) vm.taoDonVangLai(tenVangLai, sdtVangLai) { onXong() }
                         else vm.taoDon { onXong() }
                     },
-                    enabled = mhChon.isNotEmpty() && (!laVangLai || tenVangLai.isNotBlank()),
+                    enabled = !dangTao && mhChon.isNotEmpty() && (!laVangLai || tenVangLai.isNotBlank()),
                     modifier = Modifier.weight(1f),
-                ) { Text(if (laVangLai) "Tạo đơn vãng lai" else "Tạo đơn") }
+                ) { Text(if (dangTao) "Đang tạo..." else if (laVangLai) "Tạo đơn vãng lai" else "Tạo đơn") }
             }
+            if (tb.isNotEmpty()) Card { Text(tb, Modifier.padding(12.dp)) }
         }
     }
 }
