@@ -21,6 +21,7 @@ import vn.rinso.qldvyt.data.repo.LuongRepository
 class LuongViewModel @Inject constructor(
     private val repo: LuongRepository,
     private val pdf: PdfExporter,
+    private val khoPdf: vn.rinso.qldvyt.data.pdf.PdfLuuTru,
     private val caiDat: CaiDat,
     private val nhanVienDao: vn.rinso.qldvyt.data.local.NhanVienDao,
     private val capBacDao: vn.rinso.qldvyt.data.local.CapBacDao,
@@ -36,6 +37,9 @@ class LuongViewModel @Inject constructor(
     val thang = MutableStateFlow(cal.get(Calendar.MONTH) + 1)
     val nam = MutableStateFlow(cal.get(Calendar.YEAR))
     val thongBao = MutableStateFlow("")
+    /** File PDF vừa xuất xong → màn Lương tự mở trình xem trong app. */
+    val pdfMoiXuat = MutableStateFlow<java.io.File?>(null)
+    fun daMoPdf() { pdfMoiXuat.value = null }
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     val dsBangLuong = kotlinx.coroutines.flow.combine(thang, nam) { t, n -> t to n }
@@ -70,7 +74,49 @@ class LuongViewModel @Inject constructor(
     /** NV đang chờ xuất phiếu (tránh lỗi closure stale khiến file SAF tạo ra 0KB mà không ghi). */
     var pendingXuatNv: String? = null
 
-    /** Xuất phiếu lương PDF cho 1 nhân viên. */
+    private suspend fun layBangLuongNv(nvId: String): vn.rinso.qldvyt.data.local.BangLuong {
+        val bl = try {
+            repo.theoThang(thang.value, nam.value).first()
+                .firstOrNull { it.nhanVienId == nvId }
+        } catch (_: Exception) { null }
+            ?: dsBangLuong.value.firstOrNull { it.nhanVienId == nvId }
+            ?: error("Chưa có bảng lương — hãy bấm Tính lương cả tháng")
+        return bl
+    }
+
+    private suspend fun layHangTongHop(): List<Triple<vn.rinso.qldvyt.data.local.NhanVien, vn.rinso.qldvyt.data.local.BangLuong, String>> {
+        val ds = try {
+            repo.theoThang(thang.value, nam.value).first()
+        } catch (_: Exception) { dsBangLuong.value }
+        val dsDung = if (ds.isNotEmpty()) ds else dsBangLuong.value
+        require(dsDung.isNotEmpty()) { "Chưa có bảng lương — hãy bấm Tính lương cả tháng" }
+        val mapNv = try {
+            nhanVienDao.tatCa().first().associateBy { it.id }
+        } catch (_: Exception) { dsNv.value.associateBy { it.id } }
+        val rows = dsDung.mapNotNull { bl ->
+            val nv = mapNv[bl.nhanVienId] ?: return@mapNotNull null
+            val capTen = try { capBacDao.theoId(nv.capBacId)?.ten ?: "" } catch (_: Exception) { "" }
+            Triple(nv, bl, capTen)
+        }
+        require(rows.isNotEmpty()) { "Không khớp nhân viên — hãy Tính lương cả tháng rồi xuất lại" }
+        return rows
+    }
+
+    /** Xuất phiếu lương PDF cho 1 nhân viên → lưu local + tự mở xem trong app. */
+    fun xuatPhieuLuong(nvId: String) = viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+        runCatching {
+            val bl = layBangLuongNv(nvId)
+            val nv = try { nhanVienDao.theoId(nvId) } catch (_: Exception) { null }
+                ?: nvTheoId(nvId) ?: error("Không tìm thấy nhân viên")
+            val capTen = tenCapBac(nv.capBacId)
+            val file = khoPdf.filePhieu(nv.maNv.ifBlank { nvId.take(8) }, thang.value, nam.value)
+            pdf.xuatPhieuLuong(file, bl, nv, capTen, thongTinCty())
+            pdfMoiXuat.value = file
+            thongBao.value = "Đã lưu phiếu lương: ${file.name}"
+        }.onFailure { thongBao.value = it.message ?: "Xuất PDF thất bại" }
+    }
+
+    /** Xuất phiếu lương ra Uri ngoài (giữ cho nút Lưu trong trình xem). */
     fun xuatPhieuLuong(nvId: String, uri: android.net.Uri) = viewModelScope.launch {
         runCatching {
             // Lấy tươi từ DB (không phụ thuộc StateFlow màn hình) để tránh file rỗng/0KB
@@ -89,7 +135,18 @@ class LuongViewModel @Inject constructor(
         }.onFailure { thongBao.value = it.message ?: "Xuất PDF thất bại" }
     }
 
-    /** Xuất bảng lương tổng hợp cả tháng ra PDF. */
+    /** Xuất bảng tổng hợp → lưu local + tự mở xem trong app. */
+    fun xuatBangTongHop() = viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+        runCatching {
+            val rows = layHangTongHop()
+            val file = khoPdf.fileBangTong(thang.value, nam.value)
+            pdf.xuatBangLuongThang(file, thang.value, nam.value, rows, thongTinCty())
+            pdfMoiXuat.value = file
+            thongBao.value = "Đã lưu bảng tổng hợp: ${file.name} (${rows.size} NV)"
+        }.onFailure { thongBao.value = it.message ?: "Xuất PDF thất bại" }
+    }
+
+    /** Xuất bảng lương tổng hợp cả tháng ra PDF (SAF — giữ cho nút Lưu). */
     fun xuatBangTongHop(uri: android.net.Uri) = viewModelScope.launch {
         runCatching {
             val ds = try {

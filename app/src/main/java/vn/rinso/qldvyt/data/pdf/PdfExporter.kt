@@ -6,6 +6,7 @@ import android.graphics.Typeface
 import android.graphics.pdf.PdfDocument
 import android.net.Uri
 import dagger.hilt.android.qualifiers.ApplicationContext
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -126,6 +127,23 @@ class PdfExporter @Inject constructor(@ApplicationContext private val ctx: Conte
         }
     }
 
+    private fun ghiFile(doc: PdfDocument, file: File) {
+        require(doc.pages.isNotEmpty()) { "PDF chưa có trang nào — không ghi file rỗng" }
+        try {
+            file.parentFile?.mkdirs()
+            java.io.FileOutputStream(file).use { fos ->
+                java.io.BufferedOutputStream(fos).use { buf ->
+                    doc.writeTo(buf)
+                    buf.flush()
+                }
+                try { fos.fd.sync() } catch (_: Exception) { }
+            }
+            require(file.exists() && file.length() > 0) { "Ghi PDF thất bại (file rỗng)" }
+        } finally {
+            try { doc.close() } catch (_: Exception) { }
+        }
+    }
+
     /** Hóa đơn bán hàng / phiếu thu cho 1 đơn (có VAT theo cài đặt). */
     fun xuatHoaDon(
         uri: Uri, don: DonHang, kh: KhachHang?, chiTiet: List<DonHangChiTiet>,
@@ -162,8 +180,8 @@ class PdfExporter @Inject constructor(@ApplicationContext private val ctx: Conte
     }
 
     // ============ PHIẾU LƯƠNG KIỂU DOANH NGHIỆP VN ============
-    /** Phiếu lương chi tiết 1 nhân viên — bố cục chuẩn công ty lớn tại VN. */
-    fun xuatPhieuLuong(uri: Uri, bl: BangLuong, nv: NhanVien, capTen: String, cty: ThongTinCongTy) {
+    /** Dựng phiếu lương chi tiết 1 nhân viên — bố cục chuẩn công ty lớn tại VN. */
+    fun dungPhieuLuong(bl: BangLuong, nv: NhanVien, capTen: String, cty: ThongTinCongTy): PdfDocument {
         val doc = PdfDocument()
         val w = 595; val h = 842
         var soTrang = 1
@@ -291,12 +309,23 @@ class PdfExporter @Inject constructor(@ApplicationContext private val ctx: Conte
         val stamp = SimpleDateFormat("dd/MM/yyyy HH:mm", VI).format(Date())
         c.drawText("In lúc $stamp — Rinso QLDVYT (offline) — Trang $soTrang", le, (h - 36).toFloat(), pCtyNho)
         doc.finishPage(page)
-        ghi(doc, uri)
+        return doc
+    }
+
+    /** Xuất phiếu lương ra SAF Uri (giữ tương thích màn Lương cũ). */
+    fun xuatPhieuLuong(uri: Uri, bl: BangLuong, nv: NhanVien, capTen: String, cty: ThongTinCongTy) {
+        ghi(dungPhieuLuong(bl, nv, capTen, cty), uri)
+    }
+
+    /** Xuất phiếu lương ra file local để mở xem ngay trong app. */
+    fun xuatPhieuLuong(file: File, bl: BangLuong, nv: NhanVien, capTen: String, cty: ThongTinCongTy): File {
+        ghiFile(dungPhieuLuong(bl, nv, capTen, cty), file)
+        return file
     }
 
     // ============ BẢNG TỔNG HỢP LƯƠNG THÁNG (CHI TIẾT FULL) ============
-    /** Bảng lương tổng hợp cả công ty — bảng kẻ chi tiết từng NV + tổng từng cột + ngày in. */
-    fun xuatBangLuongThang(uri: Uri, thang: Int, nam: Int, cacDong: List<Triple<NhanVien, BangLuong, String>>, cty: ThongTinCongTy) {
+    /** Dựng bảng lương tổng hợp cả công ty — bảng kẻ chi tiết từng NV + tổng từng cột + ngày in. */
+    fun dungBangLuongThang(thang: Int, nam: Int, cacDong: List<Triple<NhanVien, BangLuong, String>>, cty: ThongTinCongTy): PdfDocument {
         val doc = PdfDocument()
         val w = 595; val h = 842
         val den = 0xFF111111.toInt(); val xam = 0xFF444444.toInt(); val xanh = 0xFF0D47A1.toInt()
@@ -409,7 +438,18 @@ class PdfExporter @Inject constructor(@ApplicationContext private val ctx: Conte
         val stampTong = SimpleDateFormat("dd/MM/yyyy HH:mm", VI).format(Date())
         veTrai(c, "In lúc $stampTong — Rinso QLDVYT (offline) — Trang $soTrang", le, (h - 30).toFloat(), pNho, rong)
         doc.finishPage(page)
-        ghi(doc, uri)
+        return doc
+    }
+
+    /** Xuất bảng tổng hợp ra SAF Uri (giữ tương thích). */
+    fun xuatBangLuongThang(uri: Uri, thang: Int, nam: Int, cacDong: List<Triple<NhanVien, BangLuong, String>>, cty: ThongTinCongTy) {
+        ghi(dungBangLuongThang(thang, nam, cacDong, cty), uri)
+    }
+
+    /** Xuất bảng tổng hợp ra file local để mở xem ngay trong app. */
+    fun xuatBangLuongThang(file: File, thang: Int, nam: Int, cacDong: List<Triple<NhanVien, BangLuong, String>>, cty: ThongTinCongTy): File {
+        ghiFile(dungBangLuongThang(thang, nam, cacDong, cty), file)
+        return file
     }
 
     /** Rút gọn số tiền cho vừa cột bảng tổng hợp (tr, k). */

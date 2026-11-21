@@ -1,7 +1,5 @@
 package vn.rinso.qldvyt.ui.luong
 
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -42,17 +40,19 @@ fun ManHinhLuong(vm: LuongViewModel = hiltViewModel()) {
     val nam by vm.nam.collectAsState()
     val ds by vm.dsBangLuong.collectAsState()
     val tb by vm.thongBao.collectAsState()
+    val pdfMoi by vm.pdfMoiXuat.collectAsState()
     var moDienGiai by remember { mutableStateOf<String?>(null) }
     var moSua by remember { mutableStateOf<String?>(null) }
     val tong = ds.sumOf { it.thucLinh }
 
-    val chonPhieu = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")) { uri ->
-        val nvId = vm.pendingXuatNv
-        if (uri != null && nvId != null) vm.xuatPhieuLuong(nvId, uri)
-        vm.pendingXuatNv = null
-    }
-    val chonBang = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")) { uri ->
-        if (uri != null) vm.xuatBangTongHop(uri)
+    // Sau khi xuất → tự mở PDF ngay trong app (Lưu / Chia sẻ / In / Đóng trên thanh viewer)
+    pdfMoi?.let { f ->
+        vn.rinso.qldvyt.ui.pdf.ManHinhXemPdf(
+            duongDan = f.absolutePath,
+            tieuDe = f.name,
+            onDong = { vm.daMoPdf() },
+        )
+        return
     }
 
     Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -75,7 +75,7 @@ fun ManHinhLuong(vm: LuongViewModel = hiltViewModel()) {
         }
         Button(onClick = { vm.tinhCaThang() }, modifier = Modifier.fillMaxWidth()) { Text("Tính lương cả tháng") }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = { chonBang.launch("bang-luong-${thang}-${nam}.pdf") }, modifier = Modifier.weight(1f), enabled = ds.isNotEmpty()) { Text("Xuất bảng tổng hợp PDF") }
+            OutlinedButton(onClick = { vm.xuatBangTongHop() }, modifier = Modifier.weight(1f), enabled = ds.isNotEmpty()) { Text("Xuất bảng tổng hợp PDF") }
         }
         if (ds.isEmpty()) {
             OTrong("Chưa có bảng lương", "Chấm công + hoàn thành nhiệm vụ rồi bấm Tính cả tháng.")
@@ -93,9 +93,7 @@ fun ManHinhLuong(vm: LuongViewModel = hiltViewModel()) {
                         thang = thang,
                         nam = nam,
                         onXuatPhieu = {
-                            vm.pendingXuatNv = bl.nhanVienId
-                            val tenFile = "phieu-luong-thang-$thang-$nam-${bl.nhanVienId.take(8)}.pdf"
-                            chonPhieu.launch(tenFile)
+                            vm.xuatPhieuLuong(bl.nhanVienId)
                         },
                     )
                 }

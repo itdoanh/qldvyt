@@ -12,6 +12,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Assessment
 import androidx.compose.material.icons.filled.Backup
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
@@ -80,6 +81,8 @@ object Tuyen {
     const val CAI_DAT = "cai_dat"
     const val SAO_LUU = "sao_luu"
     const val GIOI_THIEU = "gioi_thieu"
+    const val TU_PDF = "tu_pdf"
+    const val XEM_PDF = "xem_pdf"
 
     fun chiTietDon(donId: String) = "chi_tiet_don/$donId"
 }
@@ -199,12 +202,36 @@ fun QldvytNavGraph() {
                     onKho = { nav.navigate(Tuyen.KHO) },
                     onCaiDat = { nav.navigate(Tuyen.CAI_DAT) },
                     onSaoLuu = { nav.navigate(Tuyen.SAO_LUU) },
+                    onTuPdf = { nav.navigate(Tuyen.TU_PDF) },
                     onGioiThieu = { nav.navigate(Tuyen.GIOI_THIEU) },
                 )
             }
             composable(Tuyen.CAI_DAT) { ManHinhCaiDat() }
             composable(Tuyen.SAO_LUU) { ManHinhSaoLuu() }
             composable(Tuyen.GIOI_THIEU) { ManHinhGioiThieu() }
+            composable(Tuyen.TU_PDF) {
+                vn.rinso.qldvyt.ui.pdf.ManHinhTuPdf(
+                    onMoFile = { duongDan, tieuDe ->
+                        vn.rinso.qldvyt.ui.pdf.PdfChonXem.duongDan = duongDan
+                        vn.rinso.qldvyt.ui.pdf.PdfChonXem.tieuDe = tieuDe
+                        nav.navigate(Tuyen.XEM_PDF)
+                    },
+                    onBack = { nav.popBackStack() },
+                )
+            }
+            composable(Tuyen.XEM_PDF) {
+                val duongDan = vn.rinso.qldvyt.ui.pdf.PdfChonXem.duongDan
+                val tieuDe = vn.rinso.qldvyt.ui.pdf.PdfChonXem.tieuDe
+                if (duongDan.isNullOrBlank()) {
+                    androidx.compose.runtime.LaunchedEffect(Unit) { nav.popBackStack() }
+                } else {
+                    vn.rinso.qldvyt.ui.pdf.ManHinhXemPdf(
+                        duongDan = duongDan,
+                        tieuDe = tieuDe,
+                        onDong = { nav.popBackStack() },
+                    )
+                }
+            }
         }
     }
 }
@@ -222,6 +249,7 @@ private fun ManHinhThem(
     onKho: () -> Unit,
     onCaiDat: () -> Unit,
     onSaoLuu: () -> Unit,
+    onTuPdf: () -> Unit,
     onGioiThieu: () -> Unit,
 ) {
     data class Muc(val tieuDe: String, val moTa: String, val icon: ImageVector, val lam: () -> Unit)
@@ -234,6 +262,7 @@ private fun ManHinhThem(
         Muc("Dịch vụ & Gói", "15 DV + 5 gói", Icons.Filled.MedicalServices, onDichVu),
         Muc("Công nợ", "Tuổi nợ, nhắc thu", Icons.Filled.ReceiptLong, onCongNo),
         Muc("Kho", "Nhập xuất + cảnh báo", Icons.Filled.Inventory2, onKho),
+        Muc("Tủ PDF lương", "Tổng + phiếu NV theo tháng", Icons.Filled.Description, onTuPdf),
         Muc("Sao lưu", "File .zip + CSV", Icons.Filled.Backup, onSaoLuu),
         Muc("Cài đặt", "Sáng/Tối + công chuẩn", Icons.Filled.Settings, onCaiDat),
         Muc("Giới thiệu", "Rinso • itdoanh", Icons.Filled.Info, onGioiThieu),
