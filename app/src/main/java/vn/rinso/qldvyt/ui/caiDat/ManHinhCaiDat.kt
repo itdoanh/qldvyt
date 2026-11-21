@@ -169,8 +169,7 @@ fun ManHinhCaiDat(vm: CaiDatViewModel = hiltViewModel()) {
         }
         Card {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("Nhà phát triển: Rinso (Thuộc Rin)", fontWeight = FontWeight.SemiBold)
-                Text("Lập trình viên: Đoàn Văn Doanh (itdoanh)")
+                Text("Nhà phát triển: Rinso by Rin", fontWeight = FontWeight.SemiBold)
                 Text("App offline 100% — dữ liệu lưu trên máy, sao lưu bằng file.", style = MaterialTheme.typography.bodySmall)
             }
         }

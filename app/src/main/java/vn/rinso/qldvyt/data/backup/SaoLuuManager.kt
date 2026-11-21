@@ -57,7 +57,7 @@ class SaoLuuManager @Inject constructor(@ApplicationContext private val ctx: Con
                     }
                     val meta = """{"app":"vn.rinso.qldvyt","ngay":"${
                         SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale("vi", "VN")).format(Date())
-                    }","dbVersion":1,"nhaPhatTrien":"Rinso (Thuoc Rin)","lapTrinhVien":"Doan Van Doanh (itdoanh)","soFileDb":$soFile}"""
+                    }","dbVersion":1,"nhaPhatTrien":"Rinso by Rin","soFileDb":$soFile}"""
                     zip.putNextEntry(ZipEntry("meta.json"))
                     zip.write(meta.toByteArray(Charsets.UTF_8))
                     zip.closeEntry()

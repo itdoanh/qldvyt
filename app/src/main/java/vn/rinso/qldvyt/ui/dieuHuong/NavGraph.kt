@@ -265,7 +265,7 @@ private fun ManHinhThem(
         Muc("Tủ PDF lương", "Tổng + phiếu NV theo tháng", Icons.Filled.Description, onTuPdf),
         Muc("Sao lưu", "File .zip + CSV", Icons.Filled.Backup, onSaoLuu),
         Muc("Cài đặt", "Sáng/Tối + công chuẩn", Icons.Filled.Settings, onCaiDat),
-        Muc("Giới thiệu", "Rinso • itdoanh", Icons.Filled.Info, onGioiThieu),
+        Muc("Giới thiệu", "Rinso by Rin", Icons.Filled.Info, onGioiThieu),
     )
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Tất cả chức năng", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)

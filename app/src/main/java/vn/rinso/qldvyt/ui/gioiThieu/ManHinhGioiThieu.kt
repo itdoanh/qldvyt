@@ -21,9 +21,7 @@ fun ManHinhGioiThieu() {
     ) {
         Text("QLDVYT — Quản lý Dịch vụ Y tế", style = MaterialTheme.typography.headlineSmall)
         Spacer(Modifier.height(12.dp))
-        Text("Nhà phát triển: Rinso (Thuộc Rin)")
-        Text("Lập trình viên: Đoàn Văn Doanh (itdoanh)")
-        Text("Repo: github.com/itdoanh/qldvyt")
+        Text("Nhà phát triển: Rinso by Rin")
         Spacer(Modifier.height(8.dp))
         Text("Hỗ trợ Android 10 trở lên. Dữ liệu lưu local trên máy (không cần server), sao lưu/khôi phục bằng file.")
         Spacer(Modifier.height(8.dp))
