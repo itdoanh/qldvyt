@@ -159,6 +159,12 @@ interface NhiemVuDao {
     @Query("SELECT * FROM nhiem_vu WHERE trangThai = :trangThai ORDER BY ngayGiao DESC")
     fun theoTrangThai(trangThai: String): Flow<List<NhiemVu>>
 
+    @Query("SELECT * FROM nhiem_vu WHERE donHangId = :donId ORDER BY ngayGiao DESC")
+    fun theoDon(donId: String): Flow<List<NhiemVu>>
+
+    @Query("SELECT COUNT(*) FROM nhiem_vu WHERE donHangId = :donId")
+    suspend fun demTheoDon(donId: String): Int
+
     @Query("SELECT COALESCE(SUM(tienNvHuong),0) FROM nhiem_vu WHERE nhanVienId = :nvId AND trangThai='HOANTHANH' AND ngayHoanThanh BETWEEN :tu AND :den")
     suspend fun tienNhiemVuKy(nvId: String, tu: Long, den: Long): Long
 

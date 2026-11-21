@@ -71,34 +71,41 @@ fun ManHinhKhachHang(
     Scaffold(floatingActionButton = {
         FloatingActionButton(onClick = { hienThem = !hienThem }) { Icon(Icons.Filled.Add, contentDescription = "Thêm KH") }
     }) { dem ->
-        Column(Modifier.fillMaxSize().padding(dem).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("Khách hàng (${ds.size})", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-            Text("${noTheoKh.size} KH đang nợ - bấm tên để tạo đơn, bấm điện thoại để gọi.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
-            if (tb.isNotEmpty()) Card { Text(tb, Modifier.padding(12.dp)) }
-            OTimKiem(tk, { vm.tuKhoa.value = it }, "Tìm theo tên hoặc SĐT...")
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                AssistChip(onClick = { chiNo = false }, label = { Text((if (!chiNo) "✓ " else "") + "Tất cả") })
-                AssistChip(onClick = { chiNo = true }, label = { Text((if (chiNo) "✓ " else "") + "Đang nợ (${noTheoKh.size})") })
+        // LazyColumn gốc: form Thêm nằm chung luồng cuộn nên không kẹt khi bàn phím mở
+        LazyColumn(Modifier.fillMaxSize().padding(dem).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            item { Text("Khách hàng (${ds.size})", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold) }
+            item { Text("${noTheoKh.size} KH đang nợ - bấm tên để tạo đơn, bấm điện thoại để gọi.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary) }
+            if (tb.isNotEmpty()) item { Card { Text(tb, Modifier.padding(12.dp)) } }
+            item { OTimKiem(tk, { vm.tuKhoa.value = it }, "Tìm theo tên hoặc SĐT...") }
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    AssistChip(onClick = { chiNo = false }, label = { Text((if (!chiNo) "✓ " else "") + "Tất cả") })
+                    AssistChip(onClick = { chiNo = true }, label = { Text((if (chiNo) "✓ " else "") + "Đang nợ (${noTheoKh.size})") })
+                }
             }
             if (hienThem) {
-                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
-                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Thêm khách hàng mới", fontWeight = FontWeight.Bold)
-                        OutlinedTextField(oTen, { oTen = it }, label = { Text("Họ tên (*)") }, modifier = Modifier.fillMaxWidth())
-                        OutlinedTextField(oSdt, { oSdt = it.filter(Char::isDigit) }, label = { Text("SĐT") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-                        OutlinedTextField(oDiaChi, { oDiaChi = it }, label = { Text("Địa chỉ") }, modifier = Modifier.fillMaxWidth())
-                        Button(onClick = {
-                            vm.them(oTen, oSdt, oDiaChi)
-                            oTen = ""; oSdt = ""; oDiaChi = ""; hienThem = false
-                        }, modifier = Modifier.fillMaxWidth()) { Text("Lưu khách hàng") }
+                item {
+                    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
+                        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("Thêm khách hàng mới", fontWeight = FontWeight.Bold)
+                                OutlinedButton(onClick = { hienThem = false }) { Text("Đóng") }
+                            }
+                            OutlinedTextField(oTen, { oTen = it }, label = { Text("Họ tên (*)") }, modifier = Modifier.fillMaxWidth())
+                            OutlinedTextField(oSdt, { oSdt = it.filter(Char::isDigit) }, label = { Text("SĐT") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                            OutlinedTextField(oDiaChi, { oDiaChi = it }, label = { Text("Địa chỉ") }, modifier = Modifier.fillMaxWidth())
+                            Button(onClick = {
+                                vm.them(oTen, oSdt, oDiaChi)
+                                oTen = ""; oSdt = ""; oDiaChi = ""; hienThem = false
+                            }, modifier = Modifier.fillMaxWidth()) { Text("Lưu khách hàng") }
+                        }
                     }
                 }
             }
             if (dsHien.isEmpty()) {
-                OTrong("Chưa có khách hàng", "Bấm + để thêm khách mới.", Icons.Filled.Person)
+                item { OTrong("Chưa có khách hàng", "Bấm + để thêm khách mới.", Icons.Filled.Person) }
             } else {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(dsHien, key = { it.id }) { kh ->
+                items(dsHien, key = { it.id }) { kh ->
                         val no = noTheoKh[kh.id]?.sumOf { d -> d.conNo } ?: 0L
                         val dons = donTheoKh[kh.id] ?: emptyList()
                         val chi = dons.filter { it.trangThai == "HOAN_THANH" }.sumOf { it.tongThanhToan }
@@ -150,7 +157,6 @@ fun ManHinhKhachHang(
                             }
                         }
                     }
-                }
             }
         }
     }

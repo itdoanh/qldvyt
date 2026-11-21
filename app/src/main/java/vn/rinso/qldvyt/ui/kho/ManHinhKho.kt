@@ -37,7 +37,7 @@ import vn.rinso.qldvyt.core.dinhDangTien
 import vn.rinso.qldvyt.ui.common.OTimKiem
 import vn.rinso.qldvyt.ui.common.OTrong
 
-/** Màn Kho v3: cảnh báo + trị giá + lịch sử nhập + thêm vật tư. */
+/** Màn Kho: 1 luồng cuộn LazyColumn — form Nhập nằm chung nên không kẹt khi bàn phím mở. */
 @Composable
 fun ManHinhKho(vm: KhoViewModel = hiltViewModel()) {
     val ds by vm.dsVatTu.collectAsState()
@@ -65,74 +65,76 @@ fun ManHinhKho(vm: KhoViewModel = hiltViewModel()) {
     Scaffold(floatingActionButton = {
         FloatingActionButton(onClick = { hienNhap = !hienNhap }) { Icon(Icons.Filled.Add, contentDescription = "Nhập kho") }
     }) { dem ->
-        Column(Modifier.fillMaxSize().padding(dem).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("Kho vật tư (${ds.size})", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-            Text("Trị giá kho: ${dinhDangTien(triGia)} - Sắp hết: ${sapHet.size}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
-            if (tb.isNotEmpty()) Card { Text(tb, Modifier.padding(12.dp)) }
+        LazyColumn(Modifier.fillMaxSize().padding(dem).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            item { Text("Kho vật tư (${ds.size})", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold) }
+            item { Text("Trị giá kho: ${dinhDangTien(triGia)} - Sắp hết: ${sapHet.size}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary) }
+            if (tb.isNotEmpty()) item { Card { Text(tb, Modifier.padding(12.dp)) } }
             if (sapHet.isNotEmpty()) {
-                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
-                    Column(Modifier.padding(12.dp)) {
-                        Text("Sắp hết: ${sapHet.size} mặt hàng", fontWeight = FontWeight.Bold)
-                        Text(sapHet.take(4).joinToString { "${it.ten} (còn ${it.tonKho.toInt()})" }, style = MaterialTheme.typography.bodySmall)
+                item {
+                    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
+                        Column(Modifier.padding(12.dp)) {
+                            Text("Sắp hết: ${sapHet.size} mặt hàng", fontWeight = FontWeight.Bold)
+                            Text(sapHet.take(4).joinToString { "${it.ten} (còn ${it.tonKho.toInt()})" }, style = MaterialTheme.typography.bodySmall)
+                        }
                     }
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { tab = 0 }) { Text((if (tab == 0) "✓ " else "") + "Tồn kho") }
-                OutlinedButton(onClick = { tab = 1 }) { Text((if (tab == 1) "✓ " else "") + "Lịch sử nhập (${dsNhap.size})") }
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = { tab = 0 }) { Text((if (tab == 0) "✓ " else "") + "Tồn kho") }
+                    OutlinedButton(onClick = { tab = 1 }) { Text((if (tab == 1) "✓ " else "") + "Lịch sử nhập (${dsNhap.size})") }
+                }
             }
             if (tab == 1) {
                 if (dsNhap.isEmpty()) {
-                    OTrong("Chưa có phiếu nhập", "Bấm + để nhập kho.", Icons.Filled.Inventory2)
+                    item { OTrong("Chưa có phiếu nhập", "Bấm + để nhập kho.", Icons.Filled.Inventory2) }
                 } else {
-                    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(dsNhap.take(30), key = { it.id }) { nk ->
-                            val tenVt = mapVt[nk.vatTuId]?.ten ?: "Vật tư"
-                            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest)) {
-                                Column(Modifier.padding(12.dp).fillMaxWidth()) {
-                                    Text("$tenVt +${nk.soLuong.toInt()} x ${dinhDangTien(nk.donGiaNhap)}", fontWeight = FontWeight.Bold)
-                                    Text("${dinhDangNgay(nk.ngay)} - NCC: ${nk.nhaCungCap.ifEmpty { "không rõ" }}", style = MaterialTheme.typography.bodySmall)
-                                    Text("Thành tiền: ${dinhDangTien((nk.soLuong * nk.donGiaNhap).toLong())}", color = MaterialTheme.colorScheme.primary)
+                    items(dsNhap.take(30), key = { it.id }) { nk ->
+                        val tenVt = mapVt[nk.vatTuId]?.ten ?: "Vật tư"
+                        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest)) {
+                            Column(Modifier.padding(12.dp).fillMaxWidth()) {
+                                Text("$tenVt +${nk.soLuong.toInt()} x ${dinhDangTien(nk.donGiaNhap)}", fontWeight = FontWeight.Bold)
+                                Text("${dinhDangNgay(nk.ngay)} - NCC: ${nk.nhaCungCap.ifEmpty { "không rõ" }}", style = MaterialTheme.typography.bodySmall)
+                                Text("Thành tiền: ${dinhDangTien((nk.soLuong * nk.donGiaNhap).toLong())}", color = MaterialTheme.colorScheme.primary)
+                            }
+                        }
+                    }
+                }
+            } else {
+                item { OTimKiem(tk, { tk = it }, "Tìm vật tư theo tên / mã VT") }
+                if (hienNhap) {
+                    item {
+                        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
+                            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Text("Nhập kho (giá vốn bình quân tự cập nhật)", fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                                    OutlinedButton(onClick = { hienNhap = false }) { Text("Đóng") }
+                                }
+                                Text("Vật tư: ${ds.firstOrNull { it.id == vtChon }?.ten ?: "chọn ở danh sách dưới"}")
+                                OutlinedTextField(oSl, { oSl = it.filter { c -> c.isDigit() || c == '.' } }, label = { Text("Số lượng nhập") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                                OutlinedTextField(oGia, { oGia = it.filter(Char::isDigit) }, label = { Text("Đơn giá nhập (VNĐ)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                                OutlinedTextField(oNcc, { oNcc = it }, label = { Text("Nhà cung cấp") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                                Button(onClick = {
+                                    if (vtChon != null) {
+                                        vm.nhapKho(vtChon!!, oSl.toDoubleOrNull() ?: 0.0, oGia.toLongOrNull() ?: 0L)
+                                        oSl = ""; oGia = ""; oNcc = ""; hienNhap = false
+                                    }
+                                }, enabled = vtChon != null, modifier = Modifier.fillMaxWidth()) { Text("Xác nhận nhập kho") }
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    OutlinedTextField(oTen, { oTen = it }, label = { Text("Tên vật tư mới") }, modifier = Modifier.weight(1f))
+                                    OutlinedButton(onClick = { vm.themVatTu(oTen, "cái", 5.0); oTen = "" }) { Text("+ Thêm") }
                                 }
                             }
                         }
                     }
                 }
-                return@Column
-            }
-            OTimKiem(tk, { tk = it }, "Tìm vật tư theo tên / mã VT")
-            if (hienNhap) {
-                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
-                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Nhập kho (giá vốn bình quân tự cập nhật)", fontWeight = FontWeight.Bold)
-                        Text("Vật tư: ${ds.firstOrNull { it.id == vtChon }?.ten ?: "chọn ở danh sách dưới"}")
-                        OutlinedTextField(oSl, { oSl = it.filter { c -> c.isDigit() || c == '.' } }, label = { Text("Số lượng nhập") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-                        OutlinedTextField(oGia, { oGia = it.filter(Char::isDigit) }, label = { Text("Đơn giá nhập (VNĐ)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-                        OutlinedTextField(oNcc, { oNcc = it }, label = { Text("Nhà cung cấp") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-                        Button(onClick = {
-                            if (vtChon != null) {
-                                vm.nhapKho(vtChon!!, oSl.toDoubleOrNull() ?: 0.0, oGia.toLongOrNull() ?: 0L)
-                                oSl = ""; oGia = ""; oNcc = ""; hienNhap = false
-                            }
-                        }, enabled = vtChon != null, modifier = Modifier.fillMaxWidth()) { Text("Xác nhận nhập kho") }
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedTextField(oTen, { oTen = it }, label = { Text("Tên vật tư mới") }, modifier = Modifier.weight(1f))
-                            OutlinedButton(onClick = { vm.themVatTu(oTen, "cái", 5.0); oTen = "" }) { Text("+ Thêm") }
-                        }
-                    }
-                }
-            }
-            if (dsLoc.isEmpty()) {
-                OTrong("Không tìm thấy vật tư", "Thử từ khóa khác hoặc thêm vật tư mới.", Icons.Filled.Inventory2)
-            } else {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (dsLoc.isEmpty()) {
+                    item { OTrong("Không tìm thấy vật tư", "Thử từ khóa khác hoặc thêm vật tư mới.", Icons.Filled.Inventory2) }
+                } else {
                     items(dsLoc, key = { it.id }) { vt ->
                         val het = vt.tonKho < vt.tonToiThieu
                         Card(
-                            onClick = {
-                                // Chạm thẻ chỉ chọn highlight để xem, KHÔNG tự mở form nhập kho
-                                vtChon = vt.id
-                            },
+                            onClick = { vtChon = vt.id },
                             colors = if (het) CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
                             else CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest),
                         ) {

@@ -64,9 +64,15 @@ fun ManHinhNhiemVu(vm: NhiemVuViewModel = hiltViewModel()) {
     val dsNv by vm.dsNv.collectAsState()
     val tyLeMacDinh by vm.tyLeMacDinh.collectAsState()
     val tb by vm.thongBao.collectAsState()
+    val dsDon by vm.dsDon.collectAsState()
+    val dsKh by vm.dsKhach.collectAsState()
+    val cacheCt by vm.chiTietTheoDon.collectAsState()
     var loc by remember { mutableStateOf<String?>(null) }
     var tk by remember { mutableStateOf("") }
     var hienForm by remember { mutableStateOf(false) }
+    var cheDo by remember { mutableStateOf("DON") }
+    var tkDon by remember { mutableStateOf("") }
+    var donChon by remember { mutableStateOf<String?>(null) }
     var nvChon by remember { mutableStateOf<String?>(null) }
     var oTen by remember { mutableStateOf("") }
     var oGia by remember { mutableStateOf("") }
@@ -123,37 +129,100 @@ fun ManHinhNhiemVu(vm: NhiemVuViewModel = hiltViewModel()) {
             }
             if (hienForm) {
                 item {
+                    val mapKh = dsKh.associateBy { it.id }
+                    val donCanLam = dsDon.filter {
+                        (it.trangThai == "CHO_XU_LY" || it.trangThai == "DANG_LAM") &&
+                            (tkDon.isBlank() || it.maDh.contains(tkDon.trim(), true) ||
+                                (mapKh[it.khachHangId]?.hoTen?.contains(tkDon.trim(), true) == true))
+                    }.take(10)
                     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
                         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Text("Giao việc mới", fontWeight = FontWeight.Bold)
                                 OutlinedButton(onClick = { hienForm = false }) { Text("Đóng") }
                             }
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                AssistChip(onClick = { cheDo = "DON" }, label = { Text((if (cheDo == "DON") "✓ " else "") + "Theo đơn hàng") })
+                                AssistChip(onClick = { cheDo = "TUDO" }, label = { Text((if (cheDo == "TUDO") "✓ " else "") + "Việc tự do") })
+                            }
                             if (dsNv.isEmpty()) Text("Chưa có NV đang làm.")
                             else {
-                                Text("Gợi ý NV rảnh: " + nvGoiY.joinToString { "${it.hoTen} (${viecDangLam[it.id] ?: 0} việc)" })
+                                Text("B1 — chọn NV: " + nvGoiY.joinToString { "${it.hoTen} (${viecDangLam[it.id] ?: 0} việc)" }, style = MaterialTheme.typography.bodySmall)
                                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                     dsNv.take(12).forEach { nv ->
                                         AssistChip(onClick = { nvChon = nv.id }, label = { Text((if (nvChon == nv.id) "✓ " else "") + "${nv.hoTen} - ${nv.maNv} (${viecDangLam[nv.id] ?: 0})") })
                                     }
                                 }
                             }
-                            OutlinedTextField(oTen, { oTen = it }, label = { Text("Tên công việc (*)") }, modifier = Modifier.fillMaxWidth())
-                            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                listOf("TIEM_TRUYEN", "THAY_BANG", "THU_TUC", "KHAC").forEach { loai ->
-                                    AssistChip(onClick = { loaiChon = loai }, label = { Text((if (loaiChon == loai) "✓ " else "") + tenLoaiViec(loai)) })
+                            if (cheDo == "DON") {
+                                Text("B2 — chọn đơn đang cần làm (${donCanLam.size}):", fontWeight = FontWeight.Bold)
+                                OTimKiem(tkDon, { tkDon = it }, "Tìm đơn theo mã / tên KH...")
+                                if (donCanLam.isEmpty()) {
+                                    Text("Không còn đơn Chờ xử lý / Đang làm — hãy tạo đơn mới.", style = MaterialTheme.typography.bodySmall)
+                                } else {
+                                    donCanLam.forEach { don ->
+                                        val kh = mapKh[don.khachHangId]
+                                        Card(
+                                            onClick = {
+                                                donChon = if (donChon == don.id) null else don.id
+                                                if (donChon == don.id) vm.taiChiTiet(don.id)
+                                            },
+                                            colors = CardDefaults.cardColors(
+                                                containerColor = if (donChon == don.id) MaterialTheme.colorScheme.secondaryContainer
+                                                else MaterialTheme.colorScheme.surfaceContainerHighest
+                                            ),
+                                        ) {
+                                            Column(Modifier.padding(10.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                                Text((if (donChon == don.id) "✓ " else "") + "${don.maDh} — ${kh?.hoTen ?: "KH lẻ"}", fontWeight = FontWeight.SemiBold)
+                                                Text("TT: ${don.trangThai} — Tiền: ${dinhDangTien(don.tongThanhToan)}", style = MaterialTheme.typography.bodySmall)
+                                            }
+                                        }
+                                    }
                                 }
+                                if (donChon != null) {
+                                    val cts = cacheCt[donChon]
+                                    Text("B3 — chọn dòng dịch vụ để giao:", fontWeight = FontWeight.Bold)
+                                    if (cts == null) {
+                                        androidx.compose.runtime.LaunchedEffect(donChon) { vm.taiChiTiet(donChon!!) }
+                                        Text("Đang tải chi tiết đơn...", style = MaterialTheme.typography.bodySmall)
+                                    } else if (cts.isEmpty()) {
+                                        Text("Đơn này chưa có dòng dịch vụ.", style = MaterialTheme.typography.bodySmall)
+                                    } else {
+                                        cts.forEach { ct ->
+                                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                                Column(Modifier.weight(1f)) {
+                                                    Text(ct.tenHienThi, fontWeight = FontWeight.SemiBold)
+                                                    Text("SL ${ct.soLuong.toInt()} × ${dinhDangTien(ct.donGia)} = ${dinhDangTien(ct.thanhTien)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                                                }
+                                                OutlinedButton(
+                                                    onClick = {
+                                                        if (nvChon != null) vm.giaoViecTheoDongDon(nvChon!!, donChon!!, ct.id, tyLeMacDinh)
+                                                    },
+                                                    enabled = nvChon != null,
+                                                ) { Text("Giao") }
+                                            }
+                                        }
+                                        if (nvChon == null) Text("Hãy chọn NV ở B1 trước khi bấm Giao.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                                    }
+                                }
+                            } else {
+                                OutlinedTextField(oTen, { oTen = it }, label = { Text("Tên công việc (*)") }, modifier = Modifier.fillMaxWidth())
+                                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    listOf("TIEM_TRUYEN", "THAY_BANG", "THU_TUC", "KHAC").forEach { loai ->
+                                        AssistChip(onClick = { loaiChon = loai }, label = { Text((if (loaiChon == loai) "✓ " else "") + tenLoaiViec(loai)) })
+                                    }
+                                }
+                                OutlinedTextField(oGia, { oGia = it.filter(Char::isDigit) }, label = { Text("Tổng giá (VNĐ)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                                val giaLong = oGia.toLongOrNull() ?: 0L
+                                if (giaLong > 0) Text("NV sẽ hưởng: ${dinhDangTien((giaLong * tyLeMacDinh).toLong())} (${(tyLeMacDinh * 100).toInt()}%)", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                                if (nvChon == null) Text("Hãy chọn 1 nhân viên ở trên.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                                Button(onClick = {
+                                    if (nvChon != null) {
+                                        vm.giaoViec(nvChon!!, oTen, loaiChon, giaLong, tyLeMacDinh, null)
+                                        oTen = ""; oGia = ""; nvChon = null; hienForm = false
+                                    }
+                                }, enabled = nvChon != null, modifier = Modifier.fillMaxWidth()) { Text("Giao việc tự do") }
                             }
-                            OutlinedTextField(oGia, { oGia = it.filter(Char::isDigit) }, label = { Text("Tổng giá (VNĐ)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-                            val giaLong = oGia.toLongOrNull() ?: 0L
-                            if (giaLong > 0) Text("NV sẽ hưởng: ${dinhDangTien((giaLong * tyLeMacDinh).toLong())} (${(tyLeMacDinh * 100).toInt()}%)", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-                            if (nvChon == null) Text("Hãy chọn 1 nhân viên ở trên.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-                            Button(onClick = {
-                                if (nvChon != null) {
-                                    vm.giaoViec(nvChon!!, oTen, loaiChon, giaLong, tyLeMacDinh)
-                                    oTen = ""; oGia = ""; nvChon = null; hienForm = false
-                                }
-                            }, enabled = nvChon != null, modifier = Modifier.fillMaxWidth()) { Text("Giao việc") }
                         }
                     }
                 }
@@ -165,6 +234,7 @@ fun ManHinhNhiemVu(vm: NhiemVuViewModel = hiltViewModel()) {
             } else {
                 items(dsLoc, key = { it.id }) { viec ->
                     val tenNv = mapNv[viec.nhanVienId]?.hoTen ?: "NV ${viec.nhanVienId.take(6)}"
+                    val donLienQuan = dsDon.firstOrNull { it.id == viec.donHangId }
                     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest)) {
                         Column(Modifier.padding(12.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -172,6 +242,9 @@ fun ManHinhNhiemVu(vm: NhiemVuViewModel = hiltViewModel()) {
                                 NhanTrangThai(viec.trangThai, tenTrangThaiViec(viec.trangThai), mauTrangThaiViec(viec.trangThai))
                             }
                             Text("$tenNv - ${viec.maViec} - ${tenLoaiViec(viec.loai)} - Giá: ${dinhDangTien(viec.tongGia)}", style = MaterialTheme.typography.bodySmall)
+                            if (donLienQuan != null) {
+                                Text("Theo đơn: ${donLienQuan.maDh} (${donLienQuan.trangThai})", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                            }
                             if (viec.trangThai == "HOANTHANH") {
                                 Text("NV hưởng: ${dinhDangTien(viec.tienNvHuong)} (${(viec.tyLeHuong * 100).toInt()}%)", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                             } else if (viec.tongGia > 0) {

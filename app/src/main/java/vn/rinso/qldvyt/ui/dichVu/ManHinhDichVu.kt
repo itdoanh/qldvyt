@@ -76,60 +76,75 @@ fun ManHinhDichVu(vm: DichVuViewModel = hiltViewModel()) {
     Scaffold(floatingActionButton = {
         FloatingActionButton(onClick = { hienForm = !hienForm }) { Icon(Icons.Filled.Add, contentDescription = "Thêm") }
     }) { dem ->
-        Column(Modifier.fillMaxSize().padding(dem).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(
-                if (tab == 0) "Dịch vụ (${dsDv.size})" else "Gói dịch vụ (${dsGoi.size})",
-                style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold,
-            )
-            Text("Xếp theo doanh thu đã bán - giá catalog chỉ là gợi ý, bán sẽ snapshot vào đơn. Bật/tắt VAT từng món, đơn mới áp theo.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
-            if (tb.isNotEmpty()) Card { Text(tb, Modifier.padding(12.dp)) }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                AssistChip(onClick = { tab = 0 }, label = { Text((if (tab == 0) "✓ " else "") + "Dịch vụ") })
-                AssistChip(onClick = { tab = 1 }, label = { Text((if (tab == 1) "✓ " else "") + "Gói") })
+        // LazyColumn gốc: form Thêm + chip lọc + danh sách chung 1 luồng cuộn, không kẹt khi bàn phím mở
+        LazyColumn(Modifier.fillMaxSize().padding(dem).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            item {
+                Text(
+                    if (tab == 0) "Dịch vụ (${dsDv.size})" else "Gói dịch vụ (${dsGoi.size})",
+                    style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold,
+                )
             }
-            OTimKiem(tk, { tk = it }, "Tìm theo tên / mã...")
-            if (tab == 0) {
+            item { Text("Xếp theo doanh thu đã bán - giá catalog chỉ là gợi ý, bán sẽ snapshot vào đơn. Bật/tắt VAT từng món, đơn mới áp theo.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary) }
+            if (tb.isNotEmpty()) item { Card { Text(tb, Modifier.padding(12.dp)) } }
+            item {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    AssistChip(onClick = { nhomLoc = null }, label = { Text((if (nhomLoc == null) "✓ " else "") + "Tất cả") })
-                    DS_NHOM.take(3).forEach { n ->
-                        AssistChip(onClick = { nhomLoc = n }, label = { Text((if (nhomLoc == n) "✓ " else "") + tenNhomSo(n).substringBefore(" ")) })
+                    AssistChip(onClick = { tab = 0 }, label = { Text((if (tab == 0) "✓ " else "") + "Dịch vụ") })
+                    AssistChip(onClick = { tab = 1 }, label = { Text((if (tab == 1) "✓ " else "") + "Gói") })
+                }
+            }
+            item { OTimKiem(tk, { tk = it }, "Tìm theo tên / mã...") }
+            if (tab == 0) {
+                item {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        AssistChip(onClick = { nhomLoc = null }, label = { Text((if (nhomLoc == null) "✓ " else "") + "Tất cả") })
+                        DS_NHOM.take(3).forEach { n ->
+                            AssistChip(onClick = { nhomLoc = n }, label = { Text((if (nhomLoc == n) "✓ " else "") + tenNhomSo(n).substringBefore(" ")) })
+                        }
                     }
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    DS_NHOM.drop(3).forEach { n ->
-                        AssistChip(onClick = { nhomLoc = n }, label = { Text((if (nhomLoc == n) "✓ " else "") + tenNhomSo(n).substringBefore(" ")) })
+                item {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        DS_NHOM.drop(3).forEach { n ->
+                            AssistChip(onClick = { nhomLoc = n }, label = { Text((if (nhomLoc == n) "✓ " else "") + tenNhomSo(n).substringBefore(" ")) })
+                        }
                     }
                 }
             }
             if (hienForm) {
-                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
-                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(if (tab == 0) "Thêm dịch vụ" else "Thêm gói", fontWeight = FontWeight.Bold)
-                        OutlinedTextField(oTen, { oTen = it }, label = { Text(if (tab == 0) "Tên dịch vụ (*)" else "Tên gói (*)") }, modifier = Modifier.fillMaxWidth())
-                        OutlinedTextField(oGia, { oGia = it.filter(Char::isDigit) }, label = { Text("Giá (VNĐ)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-                        if (tab == 0) {
-                            OutlinedTextField(oDv, { oDv = it }, label = { Text("Đơn vị (lần/ca/buổi...)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                                Column(Modifier.weight(1f)) {
-                                    Text("Chịu thuế VAT", fontWeight = FontWeight.SemiBold)
-                                    Text("Tắt nếu dịch vụ được miễn VAT (VD: khám chữa bệnh)", style = MaterialTheme.typography.bodySmall)
-                                }
-                                Switch(checked = oChiuThue, onCheckedChange = { oChiuThue = it })
+                item {
+                    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
+                        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text(if (tab == 0) "Thêm dịch vụ" else "Thêm gói", fontWeight = FontWeight.Bold)
+                                OutlinedButton(onClick = { hienForm = false }) { Text("Đóng") }
                             }
+                            OutlinedTextField(oTen, { oTen = it }, label = { Text(if (tab == 0) "Tên dịch vụ (*)" else "Tên gói (*)") }, modifier = Modifier.fillMaxWidth())
+                            OutlinedTextField(oGia, { oGia = it.filter(Char::isDigit) }, label = { Text("Giá (VNĐ)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                            if (tab == 0) {
+                                OutlinedTextField(oDv, { oDv = it }, label = { Text("Đơn vị (lần/ca/buổi...)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                    Column(Modifier.weight(1f)) {
+                                        Text("Chịu thuế VAT", fontWeight = FontWeight.SemiBold)
+                                        Text("Tắt nếu dịch vụ được miễn VAT (VD: khám chữa bệnh)", style = MaterialTheme.typography.bodySmall)
+                                    }
+                                    Switch(checked = oChiuThue, onCheckedChange = { oChiuThue = it })
+                                }
+                            }
+                            Button(onClick = {
+                                val gia = oGia.toLongOrNull() ?: 0L
+                                if (tab == 0) vm.themDichVu(oTen, gia, oDv.ifBlank { "lần" }, nhomLoc ?: "KHAC", oChiuThue)
+                                else vm.themGoi(oTen, gia)
+                                oTen = ""; oGia = ""; hienForm = false; oChiuThue = true
+                            }, modifier = Modifier.fillMaxWidth()) { Text("Lưu") }
+                            Text("Giá catalog chỉ là gợi ý - khi bán sẽ snapshot vào đơn, đổi giá không ảnh hưởng đơn cũ.", style = MaterialTheme.typography.bodySmall)
                         }
-                        Button(onClick = {
-                            val gia = oGia.toLongOrNull() ?: 0L
-                            if (tab == 0) vm.themDichVu(oTen, gia, oDv.ifBlank { "lần" }, nhomLoc ?: "KHAC", oChiuThue)
-                            else vm.themGoi(oTen, gia)
-                            oTen = ""; oGia = ""; hienForm = false; oChiuThue = true
-                        }, modifier = Modifier.fillMaxWidth()) { Text("Lưu") }
-                        Text("Giá catalog chỉ là gợi ý - khi bán sẽ snapshot vào đơn, đổi giá không ảnh hưởng đơn cũ.", style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }
             if (tab == 0) {
-                if (dsDvLoc.isEmpty()) OTrong("Không có dịch vụ", "Đổi từ khóa hoặc thêm mới.")
-                else LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (dsDvLoc.isEmpty()) {
+                    item { OTrong("Không có dịch vụ", "Đổi từ khóa hoặc thêm mới.") }
+                } else {
                     items(dsDvLoc, key = { it.id }) { dv ->
                         val cts = banTheoDv[dv.id] ?: emptyList()
                         val dt = cts.sumOf { it.thanhTien }
@@ -171,8 +186,9 @@ fun ManHinhDichVu(vm: DichVuViewModel = hiltViewModel()) {
                     }
                 }
             } else {
-                if (dsGoiLoc.isEmpty()) OTrong("Chưa có gói", "Bấm + để thêm gói mới.")
-                else LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (dsGoiLoc.isEmpty()) {
+                    item { OTrong("Chưa có gói", "Bấm + để thêm gói mới.") }
+                } else {
                     items(dsGoiLoc, key = { it.id }) { goi ->
                         val cts = banTheoGoi[goi.id] ?: emptyList()
                         val dt = cts.sumOf { it.thanhTien }
